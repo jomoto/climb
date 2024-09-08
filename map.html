@@ -1,0 +1,37 @@
+import folium
+import pandas as pd
+
+csv_file_path = '/Users/shinojomoto/Desktop/ticks.csv'
+
+# Load the CSV file into a pandas DataFrame (replace with your file path)
+ticks_df = pd.read_csv('/Users/shinojomoto/Desktop/ticks.csv')
+
+# Extract and convert latitude and longitude
+lat_long = ticks_df['Lat and long'].str.split(',', expand=True)
+lat_long.columns = ['Latitude', 'Longitude']
+lat_long['Latitude'] = pd.to_numeric(lat_long['Latitude'], errors='coerce')
+lat_long['Longitude'] = pd.to_numeric(lat_long['Longitude'], errors='coerce')
+ticks_df[['Latitude', 'Longitude']] = lat_long
+
+# Create a Folium map centered at the mean latitude and longitude
+mean_lat = ticks_df['Latitude'].mean()
+mean_lon = ticks_df['Longitude'].mean()
+my_map = folium.Map(location=[mean_lat, mean_lon], zoom_start=5)
+
+# Group routes by latitude and longitude
+grouped_routes = ticks_df.groupby(['Latitude', 'Longitude'])
+
+# Add markers with popups to the map
+for (lat, lon), group in grouped_routes:
+    # Create a list of route names for this location
+    route_names = group['Route'].tolist()
+    # Create the popup content as a string of route names
+    popup_content = '<br>'.join(route_names)
+    # Create a folium Marker instance
+    marker = folium.Marker(location=[lat, lon], popup=popup_content)
+    # Add the marker to the map
+    marker.add_to(my_map)
+
+# Save the interactive map as an HTML file
+my_map.save('map.html')
+
