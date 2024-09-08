@@ -4,7 +4,7 @@ import pandas as pd
 csv_file_path = '/Users/shinojomoto/Desktop/ticks.csv'
 
 # Load the CSV file into a pandas DataFrame (replace with your file path)
-ticks_df = pd.read_csv('/Users/shinojomoto/Desktop/ticks.csv')
+ticks_df = pd.read_csv('ticks.csv')
 
 # Extract and convert latitude and longitude
 lat_long = ticks_df['Lat and long'].str.split(',', expand=True)
