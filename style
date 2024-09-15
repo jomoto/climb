@@ -1,0 +1,83 @@
+/* General styles */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+header {
+    background-color: #000;
+    color: #fff;
+    padding: 20px;
+    text-align: center;
+}
+
+header nav ul {
+    list-style: none;
+    padding: 0;
+}
+
+header nav ul li {
+    display: inline;
+    margin-right: 15px;
+}
+
+header nav ul li a {
+    color: #fff;
+    text-decoration: none;
+}
+
+header nav ul li a:hover {
+    text-decoration: underline;
+}
+
+/* Hero section */
+.hero {
+    background: linear-gradient(90deg, rgba(173,216,230,1) 0%, rgba(144,238,144,1) 100%);
+    text-align: center;
+    padding: 50px;
+    color: #000;
+}
+
+.hero h1 {
+    margin: 0;
+    font-size: 3em;
+}
+
+.hero p {
+    font-size: 1.2em;
+}
+
+/* Blog post section */
+.blog-posts, .trip-reports, .links {
+    padding: 20px;
+}
+
+h2 {
+    margin-top: 0;
+}
+
+/* Hyperlink styling */
+a {
+    color: #4682B4; /* Medium steel blue */
+    text-decoration: none;
+    margin-left: 12.7px; /* Moves the links over by half an inch */
+}
+
+a:hover {
+    color: #5F9EA0; /* Lighter cadet blue on hover */
+    text-decoration: underline; /* Underline on hover */
+}
+
+/* Footer */
+footer {
+    background-color: #000;
+    color: #fff;
+    text-align: center;
+    padding: 10px 0;
+    position: fixed;
+    width: 100%;
+    bottom: 0;
+}
