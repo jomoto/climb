@@ -133,6 +133,49 @@
     L.control.layers(null, overlayMaps, {collapsed: false}).addTo(map);
 </script>
 
+
+<script>
+    // Load the GeoJSON file from GitHub's raw URL
+    var geojsonLayer = L.geoJSON(null, {
+        style: function (feature) {
+            return { color: 'blue', weight: 4 };  // Customize track appearance
+        },
+        onEachFeature: function (feature, layer) {
+            // Popup showing metadata
+            if (feature.properties) {
+                layer.bindPopup("<b>Track Date:</b> " + feature.properties.date + "<br>" +
+                                "<b>Mileage:</b> " + feature.properties.mileage + "<br>" +
+                                "<b>Elevation Gain:</b> " + feature.properties.elevation_gain + "<br>" +
+                                "<b>Time Taken:</b> " + feature.properties.time);
+            }
+        }
+    });
+
+    // Fetch the GeoJSON from the correct raw URL
+    fetch('https://raw.githubusercontent.com/jomoto/climb/main/assets/tracks/watchtower.geojson')
+        .then(function (response) {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(function (data) {
+            geojsonLayer.addData(data);  // Add the loaded data to the map
+        })
+        .catch(function (error) {
+            console.error('Error loading GeoJSON data:', error);
+            alert('Error loading GeoJSON data: ' + error.message);  // Alert user if GeoJSON fails to load
+        });
+
+    // Add the GeoJSON layer to the overlay map control
+    var overlayMaps = {
+        "Pins": marker_cluster,
+        "Tracks": geojsonLayer
+    };
+
+    L.control.layers(null, overlayMaps, {collapsed: false}).addTo(map);
+</script>
+
 </body>
 <script>
     
