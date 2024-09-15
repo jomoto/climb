@@ -1,6 +1,6 @@
 /* General styles */
 body {
-    font-family: Arial, sans-serif;
+    font-family: "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
     margin: 0;
     padding: 0;
     background-color: #f0f0f0;
@@ -35,7 +35,7 @@ header nav ul li a:hover {
 
 /* Hero section */
 .hero {
-    background: linear-gradient(90deg, rgba(173,216,230,1) 0%, rgba(144,238,144,1) 100%);
+    background: linear-gradient(90deg, rgba(100,149,237,1) 0%, rgba(72,209,204,1) 100%);
     text-align: center;
     padding: 50px;
     color: #000;
@@ -47,12 +47,13 @@ header nav ul li a:hover {
 }
 
 .hero p {
-    font-size: 1.2em;
+    font-size: 0.9em; /* Smaller paragraph text */
 }
 
 /* Blog post section */
 .blog-posts, .trip-reports, .links {
     padding: 20px;
+    font-family: inherit; /* Inherits from body */
 }
 
 h2 {
