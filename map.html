@@ -106,6 +106,33 @@
     L.control.layers(null, overlayMaps).addTo(map);
 </script>
 
+
+<script>
+    // Marker cluster for existing markers
+    var marker_cluster = L.markerClusterGroup();
+
+    // Add existing markers from the original map
+    var marker_1 = L.marker([42.07673, -113.7137]).bindPopup("<b>Date:</b> 2020-10-18<br><b>Route:</b> Firewater<br><b>Rating:</b> 5.11b");
+    marker_cluster.addLayer(marker_1);
+
+    var marker_2 = L.marker([39.31642, -120.31884]).bindPopup("<b>Date:</b> 2023-06-01<br><b>Route:</b> Monkey Paws<br><b>Rating:</b> 5.12a");
+    marker_cluster.addLayer(marker_2);
+
+    var marker_3 = L.marker([36.26892, -115.66803]).bindPopup("<b>Date:</b> 2023-05-28<br><b>Route:</b> Today, We are Thursday!<br><b>Rating:</b> 5.11b");
+    marker_cluster.addLayer(marker_3);
+
+    // Add the marker cluster to the map
+    marker_cluster.addTo(map);
+
+    // Add layer control to toggle between markers and tracks
+    var overlayMaps = {
+        "Pins": marker_cluster,
+        "Tracks": geojsonLayer
+    };
+
+    L.control.layers(null, overlayMaps, {collapsed: false}).addTo(map);
+</script>
+
 </body>
 <script>
     
