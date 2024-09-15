@@ -5,30 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
     <title>Tab-a-dabba-do</title>
+    <meta name="description" content="A portfolio website showcasing projects, climbing adventures, and more.">
+    <meta name="keywords" content="portfolio, projects, climbing, blog, contact">
+    <meta name="author" content="Shino">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
     <header>
         <nav>
             <ul>
-                <li><a href="#">Projects</a></li>
-                <li><a href="#">About</a></li>
-                <li><a href="#">Climbing</a></li>
-                <li><a href="mailto:shino.jomoto@gmail.com">Contact</a></li>
+                <li><a href="projects.html">Projects</a></li> <!-- Links to projects page -->
+                <li><a href="about.html">About</a></li> <!-- Links to about page -->
+                <li><a href="climbing.html">Climbing</a></li> <!-- Links to climbing page -->
+                <li><a href="mailto:shino.jomoto@gmail.com">Contact</a></li> <!-- Email link -->
             </ul>
         </nav>
     </header>
     <main>
-        <section class="hero">
+        <section class="hero" style="background-image: url('hero-background.jpg'); text-align: center; padding: 50px 0;">
             <h1>Shino</h1>
-            <p>A portmanteau for "Shampoo" and "Dino"</p>
+            <p>Rhymes with "Dino"</p>
+            <a href="projects.html" class="cta-button">Random Work</a> <!-- Call-to-action button -->
         </section>
         <section class="blog-posts">
-            <!-- Insert blog post elements here -->
+            <h2>Latest Blog Posts</h2>
+            <article>
+                <h3>Post Title 1</h3>
+                <p>Snippet of the first blog post. <a href="post1.html">Read more</a></p>
+            </article>
+            <article>
+                <h3>Post Title 2</h3>
+                <p>Snippet of the second blog post. <a href="post2.html">Read more</a></p>
+            </article>
         </section>
-        <iframe src="map.html" width="100%" height="600"></iframe>
+        <section class="interactive-map">
+            <h2>Interactive Climbing Map</h2>
+            <iframe src="map.html" width="100%" height="600" title="Interactive Map"></iframe>
+        </section>
     </main>
     <footer>
-        <p>&copy; </p>
+        <p>&copy; 2024 Shino. All rights reserved.</p>
+        <p>
+            <a href="projects.html">Projects</a> |
+            <a href="about.html">About</a> |
+            <a href="climbing.html">Climbing</a> |
+            <a href="mailto:shino.jomoto@gmail.com">Contact</a>
+        </p>
+        <p>Follow me on <a href="https://twitter.com/shino" target="_blank">Twitter</a></p>
     </footer>
+
+    <script>
+        // Add basic form of lazy loading for images
+        document.addEventListener("DOMContentLoaded", function() {
+            let lazyImages = [].slice.call(document.querySelectorAll("img.lazy"));
+            if ("IntersectionObserver" in window) {
+                let lazyImageObserver = new IntersectionObserver(function(entries, observer) {
+                    entries.forEach(function(entry) {
+                        if (entry.isIntersecting) {
+                            let lazyImage = entry.target;
+                            lazyImage.src = lazyImage.dataset.src;
+                            lazyImage.classList.remove("lazy");
+                            lazyImageObserver.unobserve(lazyImage);
+                        }
+                    });
+                });
+
+                lazyImages.forEach(function(lazyImage) {
+                    lazyImageObserver.observe(lazyImage);
+                });
+            }
+        });
+    </script>
 </body>
 </html>
