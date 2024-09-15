@@ -43,11 +43,11 @@ header nav ul li a:hover {
 
 .hero h1 {
     margin: 0;
-    font-size: 3em;
+    font-size: 2.3em;
 }
 
 .hero p {
-    font-size: 0.9em; /* Smaller paragraph text */
+    font-size: 0.8em; /* Smaller paragraph text */
 }
 
 /* Blog post section */
