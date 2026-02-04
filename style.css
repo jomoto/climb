@@ -139,7 +139,7 @@ iframe {
 
 .climbing-grid {
     display: grid;
-    grid-template-columns: minmax(0, 2.6fr) minmax(0, 0.9fr);
+    grid-template-columns: minmax(0, 3fr) minmax(0, 0.75fr);
     gap: 32px;
 }
 
@@ -217,8 +217,10 @@ iframe {
     }
 
     .home-signature {
-        position: static;
-        margin-top: 8vh;
+        position: absolute;
+        left: 10vw;
+        bottom: 5vh;
+        margin-top: 0;
     }
 
     .climbing-grid {
