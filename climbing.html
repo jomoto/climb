@@ -3,39 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <title>Climbing Links</title>
+    <title>Climbing</title>
 </head>
-<body>
-    <header>
-        <nav>
-            <ul>
-                <li><a href="index.html">Projects</a></li>
-                <li><a href="about.html">About</a></li>
-                <li><a href="climbing.html">Climbing</a></li>
-                <li><a href="mailto:shino.jomoto@gmail.com">Contact</a></li>
-            </ul>
-        </nav>
-    </header>
-
-    <main>
-        <section class="hero">
-            <h1>Trip Reports</h1>
-            <p>from an era when I had time to touch grass</p>
-        </section>
-        
-        <section class="links">
-            <ul>
-                <li><a href="http://www.supertopo.com/tr/How-I-Learned-to-Climb-the-NIAD-in-3-Days-and-2-Nights/t11056n.html" target="_blank">The Nose in "a day"</a></li>
-                <li><a href="http://www.supertopo.com/tr/A-Laywomans-Account-of-a-Not-Too-Soggy-Siege-on-the-Salathe-with-Some-Spaniards/t11039n.html" target="_blank">The Salathe</a></li>
-                <li><a href="http://www.supertopo.com/tr/A-Laywomans-Account-of-Astroman/t11015n.html" target="_blank">Astroman</a></li>
-                <li><a href="crucifix.html" target="_blank">The Crucifix</a></li>
-            </ul>
+<body class="climbing">
+    <main class="climbing-shell">
+        <header class="climbing-header">
+            <a class="back-link" href="index.html">Home</a>
+            <h1>Climbing</h1>
+        </header>
+        <section class="climbing-grid">
+            <div class="climbing-map">
+                <iframe title="Climbing map" src="map.html" loading="lazy"></iframe>
+            </div>
+            <div class="climbing-reports">
+                <h2>Trip Reports</h2>
+                <ul>
+                    <li><a href="http://www.supertopo.com/tr/How-I-Learned-to-Climb-the-NIAD-in-3-Days-and-2-Nights/t11056n.html" target="_blank" rel="noreferrer">The Nose in "a day"</a></li>
+                    <li><a href="http://www.supertopo.com/tr/A-Laywomans-Account-of-a-Not-Too-Soggy-Siege-on-the-Salathe-with-Some-Spaniards/t11039n.html" target="_blank" rel="noreferrer">The Salathe</a></li>
+                    <li><a href="http://www.supertopo.com/tr/A-Laywomans-Account-of-Astroman/t11015n.html" target="_blank" rel="noreferrer">Astroman</a></li>
+                    <li><a href="crucifix.html" target="_blank">The Crucifix</a></li>
+                </ul>
+            </div>
         </section>
     </main>
-
-    <footer>
-        <p>&copy; </p>
-    </footer>
 </body>
 </html>
