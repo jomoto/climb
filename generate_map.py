@@ -2,8 +2,8 @@ import pandas as pd
 import folium
 from folium.plugins import MarkerCluster
 
-# Load the CSV file into a pandas DataFrame (replace with your file path)
-csv_file_path = '/Users/shino/Downloads/ticks.csv'
+# Load the CSV file into a pandas DataFrame
+csv_file_path = 'ticks 2026.csv'
 ticks_df = pd.read_csv(csv_file_path)
 
 
