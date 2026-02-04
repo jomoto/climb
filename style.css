@@ -139,7 +139,7 @@ iframe {
 
 .climbing-grid {
     display: grid;
-    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 2.6fr) minmax(0, 0.9fr);
     gap: 32px;
 }
 
