@@ -5,20 +5,20 @@
 }
 
 :root {
-    --bg: #ede6dc;
-    --bg-dark: #d8cabc;
+    --bg: #C2CDD8;
+    --bg-dark: #A8B6C4;
     --ink: #1b1916;
-    --ink-muted: #5e564d;
-    --accent: #c9a24c;
-    --accent-strong: #a47c2f;
-    --nav-hover: #8f6a3a;
+    --ink-muted: #4d555e;
+    --accent: #4A6B8A;
+    --accent-strong: #3D5A75;
+    --nav-hover: #334D66;
 }
 
 body {
     margin: 0;
     min-height: 100vh;
     font-family: "IBM Plex Mono", "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
-    background: radial-gradient(circle at top left, #f6f1e8 0%, var(--bg) 55%, var(--bg-dark) 100%);
+    background: radial-gradient(circle at top left, #D6DEE6 0%, var(--bg) 55%, var(--bg-dark) 100%);
     color: var(--ink);
 }
 
@@ -54,7 +54,7 @@ iframe {
     width: min(40vw, 360px);
     height: min(40vw, 360px);
     border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(201, 162, 76, 0.35), rgba(201, 162, 76, 0));
+    background: radial-gradient(circle at 30% 30%, rgba(74, 107, 138, 0.25), rgba(74, 107, 138, 0));
     pointer-events: none;
 }
 
@@ -88,28 +88,13 @@ iframe {
     transition: transform 250ms ease, color 250ms ease;
 }
 
-.nav-item::after {
-    content: "";
-    width: 18px;
-    height: 1px;
-    background: var(--accent);
-    opacity: 0;
-    transform: translateX(-6px);
-    transition: opacity 250ms ease, transform 250ms ease;
-}
-
 .nav-item:hover {
     color: var(--nav-hover);
     transform: translateX(10px);
 }
 
-.nav-item:hover::after {
-    opacity: 1;
-    transform: translateX(0);
-}
-
 .climbing {
-    background: linear-gradient(180deg, #f6f1e8 0%, var(--bg) 55%, #e3d7c8 100%);
+    background: linear-gradient(180deg, #D6DEE6 0%, var(--bg) 55%, #9DAEBB 100%);
     min-height: 100vh;
 }
 
