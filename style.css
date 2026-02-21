@@ -222,18 +222,21 @@ iframe {
 
 /* ── About ── */
 
-.about {
+body.about {
     background: var(--nav-hover);
     height: 100vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    color: #fff;
+    position: relative;
 }
 
 .about-home {
     position: absolute;
     top: 5vh;
     left: 6vw;
+    z-index: 10;
     font-size: 0.75rem;
     letter-spacing: 0.18em;
     text-transform: lowercase;
@@ -254,6 +257,7 @@ iframe {
     text-align: center;
     padding: 0 8vw;
     transition: opacity 150ms ease, transform 150ms ease;
+    pointer-events: none;
 }
 
 .about-text p {
