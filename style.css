@@ -225,6 +225,7 @@ iframe {
 body.about {
     background: var(--nav-hover);
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -233,7 +234,7 @@ body.about {
 }
 
 .about-home {
-    position: absolute;
+    position: fixed;
     top: 5vh;
     left: 6vw;
     z-index: 10;
@@ -343,12 +344,19 @@ body.about {
         min-height: 60vh;
     }
 
+    body.about {
+        height: 100vh;
+        height: 100dvh;
+    }
+
     .about-home {
         left: 10vw;
+        top: 4vh;
     }
 
     .about-text {
         padding: 0 10vw;
+        min-height: 0;
     }
 
     .about-text p {
@@ -357,6 +365,7 @@ body.about {
 
     .scrubber-track {
         padding: 0 10vw;
+        margin-bottom: 2vh;
     }
 
     .scrubber-line {

@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <title>About</title>
+    <style>html,body{overflow:hidden;position:fixed;width:100%;}</style>
 </head>
-<body class="about">
+<body class="about" style="margin:0;overflow:hidden">
     <a class="about-home" href="index.html">home</a>
     <div class="about-text" id="scrubber-text">
         <p>unequivocally, my favorite food is the super burrito</p>
@@ -108,11 +109,13 @@
         document.addEventListener('mouseup', onPointerUp);
         document.addEventListener('touchend', onPointerUp);
 
-        window.addEventListener('resize', function () {
+        // Fix mobile viewport height (Chrome address bar)
+        function setVh() {
+            document.body.style.height = window.innerHeight + 'px';
             updateFromProgress(progress);
-        });
-
-        updateFromProgress(0);
+        }
+        window.addEventListener('resize', setVh);
+        setVh();
     })();
     </script>
 </body>
