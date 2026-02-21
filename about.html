@@ -8,9 +8,8 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <title>About</title>
-    <style>html,body{overflow:hidden;position:fixed;width:100%;}</style>
 </head>
-<body class="about" style="margin:0;overflow:hidden">
+<body class="about">
     <a class="about-home" href="index.html">home</a>
     <div class="about-text" id="scrubber-text">
         <p>unequivocally, my favorite food is the super burrito</p>
@@ -109,13 +108,17 @@
         document.addEventListener('mouseup', onPointerUp);
         document.addEventListener('touchend', onPointerUp);
 
-        // Fix mobile viewport height (Chrome address bar)
-        function setVh() {
-            document.body.style.height = window.innerHeight + 'px';
+        // Mobile viewport fix — use actual visible height
+        function setHeight() {
+            var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            document.documentElement.style.setProperty('--app-height', h + 'px');
             updateFromProgress(progress);
         }
-        window.addEventListener('resize', setVh);
-        setVh();
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', setHeight);
+        }
+        window.addEventListener('resize', setHeight);
+        setHeight();
     })();
     </script>
 </body>

@@ -225,12 +225,13 @@ iframe {
 body.about {
     background: var(--nav-hover);
     height: 100vh;
-    height: 100dvh;
+    height: var(--app-height, 100vh);
     overflow: hidden;
     display: flex;
     flex-direction: column;
     color: #fff;
     position: relative;
+    margin: 0;
 }
 
 .about-home {
@@ -342,11 +343,6 @@ body.about {
 
     .climbing-photomap iframe {
         min-height: 60vh;
-    }
-
-    body.about {
-        height: 100vh;
-        height: 100dvh;
     }
 
     .about-home {
