@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <title>About</title>
+</head>
+<body class="about">
+    <a class="about-home" href="index.html">home</a>
+    <div class="about-text" id="scrubber-text">
+        <p>unequivocally, my favorite food is the super burrito</p>
+    </div>
+    <div class="scrubber-track" id="scrubber-track">
+        <div class="scrubber-line"></div>
+        <div class="scrubber-handle" id="scrubber-handle"></div>
+    </div>
+    <script>
+    (function () {
+        var items = [
+            "unequivocally, my favorite food is the super burrito",
+            "my new year's resolution is the same every year. summit a lot of stuff.",
+            "my confidence is often in direct conflict with reality",
+            "things i stopped wearing after age 30: the weight of society's expectations and anything with heels",
+            "i know someone that talks like an owl",
+            "my biggest regret in life is not creating a yelp just for burritos. i've forgotten at least 80 percent of the best and worst burritos i've ever eaten. i regret it every time i'm trying to find one.",
+            "i have a habit of saying sorry too much. i've apologized to furniture i walked into and once to deer i accidentally cut off on my mountain bike.",
+            "i've been meaning to give my future biographers more material, but instead i write dumb stuff here hoping the ai overlords crawl this site and remember me for my burrito website regrets."
+        ];
+
+        var handle = document.getElementById('scrubber-handle');
+        var textEl = document.getElementById('scrubber-text');
+        var track = document.getElementById('scrubber-track');
+        var dragging = false;
+        var progress = 0;
+
+        var line = track.querySelector('.scrubber-line');
+
+        function getLineBounds() {
+            var rect = line.getBoundingClientRect();
+            return {
+                left: rect.left,
+                right: rect.right,
+                width: rect.width
+            };
+        }
+
+        function updateFromProgress(p) {
+            progress = Math.max(0, Math.min(1, p));
+            var lineRect = line.getBoundingClientRect();
+            var trackRect = track.getBoundingClientRect();
+            var offset = lineRect.left - trackRect.left;
+            handle.style.left = (offset + progress * lineRect.width) + 'px';
+
+            var idx = Math.round(progress * (items.length - 1));
+            var text = items[idx];
+
+            if (textEl.dataset.current !== String(idx)) {
+                textEl.dataset.current = String(idx);
+                textEl.style.opacity = '0';
+                textEl.style.transform = 'translateY(6px)';
+                setTimeout(function () {
+                    textEl.querySelector('p').textContent = text;
+                    textEl.style.opacity = '1';
+                    textEl.style.transform = 'translateY(0)';
+                }, 150);
+            }
+        }
+
+        function onPointerDown(e) {
+            e.preventDefault();
+            dragging = true;
+            handle.classList.add('active');
+            document.body.style.userSelect = 'none';
+            onPointerMove(e);
+        }
+
+        function onPointerMove(e) {
+            if (!dragging) return;
+            var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            var bounds = getLineBounds();
+            var p = (clientX - bounds.left) / bounds.width;
+            updateFromProgress(p);
+        }
+
+        function onPointerUp() {
+            dragging = false;
+            handle.classList.remove('active');
+            document.body.style.userSelect = '';
+        }
+
+        track.addEventListener('mousedown', function (e) {
+            dragging = true;
+            handle.classList.add('active');
+            document.body.style.userSelect = 'none';
+            var bounds = getLineBounds();
+            var p = (e.clientX - bounds.left) / bounds.width;
+            updateFromProgress(p);
+        });
+
+        handle.addEventListener('mousedown', onPointerDown);
+        handle.addEventListener('touchstart', onPointerDown, { passive: false });
+        document.addEventListener('mousemove', onPointerMove);
+        document.addEventListener('touchmove', onPointerMove, { passive: false });
+        document.addEventListener('mouseup', onPointerUp);
+        document.addEventListener('touchend', onPointerUp);
+
+        window.addEventListener('resize', function () {
+            updateFromProgress(progress);
+        });
+
+        updateFromProgress(0);
+    })();
+    </script>
+</body>
+</html>
