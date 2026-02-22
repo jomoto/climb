@@ -122,6 +122,38 @@
             margin: 0;
             color: #1b1916;
         }
+
+        /* Tour navigation */
+        .popup-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px 10px;
+        }
+
+        .popup-nav button {
+            background: none;
+            border: 1px solid rgba(74, 107, 138, 0.25);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: #4A6B8A;
+            padding: 4px 10px;
+            font-family: "Franklin Gothic Medium", "Franklin Gothic", Arial, sans-serif;
+            transition: background 150ms ease, color 150ms ease;
+        }
+
+        .popup-nav button:hover {
+            background: #4A6B8A;
+            color: #fff;
+        }
+
+        .popup-hint {
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.65rem;
+            color: #9aa5b0;
+            letter-spacing: 0.04em;
+        }
     </style>
 </head>
 <body>
@@ -230,6 +262,65 @@
             return div.innerHTML;
         }
 
+        // ── Tour state ─────────────────────────────────────
+        var allMarkers = [];     // { marker, lat, lon, row }
+        var tourNeighbors = [];  // sorted by distance from current
+        var tourIndex = 0;
+        var tourActive = false;
+        var hintShown = false;
+
+        function distanceSq(lat1, lon1, lat2, lon2) {
+            var dLat = lat2 - lat1;
+            var dLon = lon2 - lon1;
+            return dLat * dLat + dLon * dLon;
+        }
+
+        function buildTourFrom(entry) {
+            var lat = entry.lat;
+            var lon = entry.lon;
+            tourNeighbors = allMarkers.slice().sort(function (a, b) {
+                return distanceSq(lat, lon, a.lat, a.lon) - distanceSq(lat, lon, b.lat, b.lon);
+            });
+            // Find current in sorted list (it'll be index 0 since distance = 0)
+            tourIndex = 0;
+            tourActive = true;
+        }
+
+        function navigateTour(direction) {
+            if (!tourActive || tourNeighbors.length === 0) return;
+            tourIndex += direction;
+            if (tourIndex < 0) tourIndex = tourNeighbors.length - 1;
+            if (tourIndex >= tourNeighbors.length) tourIndex = 0;
+
+            var next = tourNeighbors[tourIndex];
+            map.closePopup();
+
+            // Fly to marker and open popup
+            map.flyTo([next.lat, next.lon], Math.max(map.getZoom(), 10), {
+                duration: 0.8
+            });
+
+            // Wait for fly animation, then open popup
+            setTimeout(function () {
+                // Spiderfy the cluster if needed
+                clusterGroup.zoomToShowLayer(next.marker, function () {
+                    next.marker.openPopup();
+                });
+            }, 900);
+        }
+
+        // ── Keyboard navigation ────────────────────────────
+        document.addEventListener('keydown', function (e) {
+            if (!tourActive) return;
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                navigateTour(1);
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                navigateTour(-1);
+            }
+        });
+
         // ── Marker creation ────────────────────────────────
         function createMarker(row) {
             var lat = parseFloat(row.lat);
@@ -244,16 +335,59 @@
             var fullUrl = R2_BASE_URL + '/' + filename;
             var title = escapeHtml(row.title);
 
+            var hintHtml = '<span class="popup-hint">\u2190 \u2192 explore nearby</span>';
+
             var popupHtml = '<div class="photo-popup">' +
                 '<a href="' + fullUrl + '" target="_blank" rel="noreferrer">' +
                 '<img src="' + imgUrl + '" alt="' + title + '">' +
                 '</a>' +
                 '<div class="popup-body">' +
                 '<p class="popup-title">' + title + '</p>' +
-                '</div></div>';
+                '</div>' +
+                '<div class="popup-nav">' +
+                '<button class="tour-prev">\u2190 prev</button>' +
+                hintHtml +
+                '<button class="tour-next">next \u2192</button>' +
+                '</div>' +
+                '</div>';
 
             var marker = L.marker([lat, lon], { icon: createMarkerIcon() });
             marker.bindPopup(popupHtml, { maxWidth: 300, minWidth: 280 });
+
+            var entry = { marker: marker, lat: lat, lon: lon, row: row };
+            allMarkers.push(entry);
+
+            marker.on('popupopen', function () {
+                // Build tour from this marker
+                buildTourFrom(entry);
+
+                // Attach click handlers to nav buttons
+                var popup = marker.getPopup().getElement();
+                if (popup) {
+                    var prevBtn = popup.querySelector('.tour-prev');
+                    var nextBtn = popup.querySelector('.tour-next');
+                    if (prevBtn) {
+                        prevBtn.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            navigateTour(-1);
+                        });
+                    }
+                    if (nextBtn) {
+                        nextBtn.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            navigateTour(1);
+                        });
+                    }
+                }
+            });
+
+            marker.on('popupclose', function () {
+                // Keep tour active briefly so keyboard nav still works
+                // Tour resets when a new marker is manually clicked
+            });
+
             return marker;
         }
 
