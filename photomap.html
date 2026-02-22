@@ -267,7 +267,7 @@
         var tourNeighbors = [];  // sorted by distance from current
         var tourIndex = 0;
         var tourActive = false;
-        var hintShown = false;
+        var navigating = false;  // true while tour nav is in progress
 
         function distanceSq(lat1, lon1, lat2, lon2) {
             var dLat = lat2 - lat1;
@@ -293,6 +293,7 @@
             if (tourIndex >= tourNeighbors.length) tourIndex = 0;
 
             var next = tourNeighbors[tourIndex];
+            navigating = true;
             map.closePopup();
 
             // Fly to marker and open popup
@@ -358,8 +359,12 @@
             allMarkers.push(entry);
 
             marker.on('popupopen', function () {
-                // Build tour from this marker
-                buildTourFrom(entry);
+                // Only rebuild tour if user manually clicked a pin
+                if (navigating) {
+                    navigating = false;
+                } else {
+                    buildTourFrom(entry);
+                }
 
                 // Attach click handlers to nav buttons
                 var popup = marker.getPopup().getElement();
