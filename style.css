@@ -220,6 +220,77 @@ iframe {
     min-height: 80vh;
 }
 
+/* ── Projects ── */
+
+.projects {
+    background: linear-gradient(180deg, #D6DEE6 0%, var(--bg) 55%, #9DAEBB 100%);
+    min-height: 100vh;
+}
+
+.projects-shell {
+    padding: 6vh 6vw 8vh;
+}
+
+.projects-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 32px;
+}
+
+.projects-header h1 {
+    font-family: "Franklin Gothic Medium", "Franklin Gothic", "ITC Franklin Gothic", "Arial Narrow", Arial, sans-serif;
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    margin: 0;
+}
+
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px;
+}
+
+.project-card {
+    display: block;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: inset 0 0 0 1px rgba(27, 25, 22, 0.08);
+    transition: transform 250ms ease, box-shadow 250ms ease;
+    text-decoration: none;
+    color: inherit;
+}
+
+.project-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px rgba(27, 25, 22, 0.1), inset 0 0 0 1px rgba(27, 25, 22, 0.12);
+}
+
+.project-card h2 {
+    font-family: "Franklin Gothic Medium", "Franklin Gothic", "ITC Franklin Gothic", "Arial Narrow", Arial, sans-serif;
+    font-size: 1.2rem;
+    margin: 0 0 10px;
+}
+
+.project-card p {
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--ink-muted);
+    margin: 0 0 16px;
+}
+
+.project-tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgba(74, 107, 138, 0.14);
+    color: var(--accent-strong);
+    border-radius: 999px;
+    padding: 3px 10px;
+    margin-right: 6px;
+}
+
 /* ── About ── */
 
 body.about {

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vanlife Power Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <button id="themeToggle" class="theme-toggle" type="button" aria-pressed="false">
+      Dark Mode
+    </button>
+
+    <div class="background-orb orb-a"></div>
+    <div class="background-orb orb-b"></div>
+    <div class="background-orb orb-c"></div>
+
+    <main class="layout">
+      <header class="hero">
+        <p class="kicker">van build tool</p>
+        <h1>Vanlife Power Planner</h1>
+        <p class="subtitle">
+          Start with your lifestyle and climate. The app estimates daily consumption first,
+          then auto-sizes your key electrical components.
+        </p>
+      </header>
+
+      <div class="app-grid">
+        <section class="panel controls-panel">
+          <section class="panel-section">
+            <div class="section-title-row">
+              <h2>Power Profile</h2>
+              <div class="presets" id="presets">
+                <button class="preset-btn active" data-preset="weekender">Weekender</button>
+                <button class="preset-btn" data-preset="remote">Remote Work</button>
+                <button class="preset-btn" data-preset="fulltime">Full-Time</button>
+              </div>
+            </div>
+            <p class="section-copy">Select what you use. Sliders represent average daily use.</p>
+            <div class="loads-grid" id="loadsGrid"></div>
+          </section>
+
+          <section class="panel-section">
+            <h2>Solar + Driving Input</h2>
+            <p class="section-copy">
+              Charging is modeled from panel wattage, sun exposure, and alternator power while driving.
+            </p>
+
+            <div class="recharge-block">
+              <div class="block-header">
+                <h3>Solar</h3>
+                <div class="segmented" id="solarToggle">
+                  <button type="button" class="seg-btn active" data-choice="yes">Yes</button>
+                  <button type="button" class="seg-btn" data-choice="no">No</button>
+                </div>
+              </div>
+              <div id="solarControls" class="control-stack">
+                <label class="field-row" for="solarWatts">
+                  <span>Total panel power</span>
+                  <output id="solarWattsValue">300 W</output>
+                </label>
+                <input type="range" id="solarWatts" min="100" max="1800" step="25" value="300" />
+
+                <label class="field-row" for="solarEfficiency">
+                  <span>Solar system efficiency</span>
+                  <output id="solarEfficiencyValue">75%</output>
+                </label>
+                <input type="range" id="solarEfficiency" min="55" max="95" step="1" value="75" />
+                <div class="block-header top-gap">
+                  <h3>Sun Exposure</h3>
+                </div>
+                <div class="segmented" id="exposureToggle">
+                  <button type="button" class="seg-btn active" data-exposure="full">Full</button>
+                  <button type="button" class="seg-btn" data-exposure="partial">Partial</button>
+                  <button type="button" class="seg-btn" data-exposure="minimal">Minimal</button>
+                </div>
+                <p class="exposure-hint" id="exposureHint">Shading/obstruction override. Applied on top of PVWatts data when precision mode is on.</p>
+
+                <div class="solar-precision">
+                  <div class="solar-precision-header">
+                    <span>Use live month/location sun model (PVWatts)?</span>
+                    <div class="segmented" id="solarPrecisionToggle">
+                      <button id="solarPrecisionYes" type="button" class="seg-btn" data-choice="yes">Yes</button>
+                      <button id="solarPrecisionNo" type="button" class="seg-btn active" data-choice="no">No</button>
+                    </div>
+                  </div>
+                  <div id="solarPrecisionControls" class="solar-precision-body hidden">
+                    <label class="select-field" for="solarMonthSelect">
+                      <span>Month</span>
+                      <select id="solarMonthSelect">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7" selected>July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                      </select>
+                    </label>
+                    <button id="solarPinLocation" type="button" class="ghost-btn compact-btn">Pin solar location</button>
+                    <p id="solarPinSummary" class="solar-insight">No map point selected yet.</p>
+                    <p id="solarPrecisionStatus" class="solar-insight">
+                      Precision mode off. Using manual base sun-hours.
+                    </p>
+                  </div>
+                </div>
+
+                <p class="sun-hours-readout">
+                  Estimated sun hours/day: <strong id="estimatedSunHours">0.0 hr</strong>
+                </p>
+                <p id="sunHoursSource" class="sun-hours-source">Manual assumption (4.8 sun-hr/day baseline).</p>
+              </div>
+            </div>
+
+            <div class="recharge-block">
+              <div class="block-header">
+                <h3>Alternator Charging</h3>
+                <div class="segmented" id="alternatorToggle">
+                  <button type="button" class="seg-btn active" data-choice="yes">Yes</button>
+                  <button type="button" class="seg-btn" data-choice="no">No</button>
+                </div>
+              </div>
+              <div id="alternatorControls" class="control-stack">
+                <label class="field-row" for="altPower">
+                  <span>Charging power</span>
+                  <output id="altPowerValue">700 W</output>
+                </label>
+                <input type="range" id="altPower" min="200" max="3000" step="50" value="700" />
+
+                <label class="field-row" for="driveHoursDay">
+                  <span>Drive hours / day</span>
+                  <output id="driveHoursDayValue">1.0 hr</output>
+                </label>
+                <input type="range" id="driveHoursDay" min="0" max="10" step="0.25" value="1" />
+              </div>
+            </div>
+          </section>
+
+          <section class="panel-section">
+            <h2>Battery Setup</h2>
+            <p class="section-copy">Set reserve autonomy and test your planned battery bank.</p>
+
+            <div class="control-stack">
+              <label class="field-row" for="autonomyDays">
+                <span>Days of reserve goal</span>
+                <output id="autonomyDaysValue">2 days</output>
+              </label>
+              <input type="range" id="autonomyDays" min="1" max="7" step="1" value="2" />
+            </div>
+
+            <div class="inline-fields">
+              <label class="select-field" for="chemistry">
+                <span>Chemistry</span>
+                <select id="chemistry">
+                  <option value="lifepo4" selected>LiFePO4 (90% usable)</option>
+                  <option value="agm">AGM / Lead Acid (50% usable)</option>
+                  <option value="nmc">Lithium NMC (85% usable)</option>
+                </select>
+              </label>
+
+              <label class="select-field" for="batteryVoltage">
+                <span>Bank Voltage</span>
+                <select id="batteryVoltage">
+                  <option value="12" selected>12V</option>
+                  <option value="24">24V</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="control-stack">
+              <label class="field-row" for="installedAh">
+                <span>Your planned battery bank</span>
+                <output id="installedAhValue">400 Ah</output>
+              </label>
+              <input type="range" id="installedAh" min="100" max="1800" step="10" value="400" />
+            </div>
+
+            <button id="syncInstalled" class="ghost-btn" type="button">Set planned bank to recommendation</button>
+          </section>
+
+          <section class="panel-section">
+            <h2>Assumptions File</h2>
+            <p class="section-copy">
+              Download a starter settings file (includes all tunable parameters such as
+              <code>halogenWatts = 40</code>, <code>inverterEfficiencyPct = 92</code>,
+              <code>pvWattsApiKey = "DEMO_KEY"</code>), edit it, and import it.
+            </p>
+
+            <div class="button-row">
+              <button id="downloadSettings" class="ghost-btn" type="button">Download Starter Settings</button>
+              <label class="file-input" for="uploadSettings">Import Settings JSON</label>
+              <input id="uploadSettings" type="file" accept="application/json" />
+            </div>
+            <p id="settingsStatus" class="settings-status">No settings imported yet.</p>
+          </section>
+        </section>
+
+        <aside class="panel results-panel">
+          <h2>Estimated Daily Consumption</h2>
+
+          <section class="consumption-hero">
+            <p>Likely Daily Energy Usage</p>
+            <h3 id="dailyUseBig">0 Wh/day</h3>
+            <span id="dailyUseAh">0 Ah/day @ 12V</span>
+            <small id="usagePersona">Select your loads to build an energy profile.</small>
+          </section>
+
+          <div class="stat-grid">
+            <article class="stat-card">
+              <p>Daily recharge</p>
+              <h3 id="dailyRecharge">0 Wh</h3>
+            </article>
+            <article class="stat-card">
+              <p>Net from battery</p>
+              <h3 id="netFromBattery">0 Wh</h3>
+            </article>
+            <article class="stat-card">
+              <p>Reserve target</p>
+              <h3 id="autonomyTarget">0 days</h3>
+            </article>
+          </div>
+
+          <div class="recommend-grid">
+            <article class="recommend-card">
+              <p>Battery target (no recharge reserve)</p>
+              <h3 id="recNoChargeAh">0 Ah</h3>
+              <span id="recNoChargeWh">0 Wh total</span>
+            </article>
+            <article class="recommend-card">
+              <p>Battery target (with recharge assumptions)</p>
+              <h3 id="recRechargeAh">0 Ah</h3>
+              <span id="recRechargeWh">0 Wh total</span>
+            </article>
+          </div>
+
+          <section class="components-card">
+            <h3>Main Components (Auto or Manual)</h3>
+            <div class="components-toolbar">
+              <div class="segmented" id="componentModeToggle">
+                <button type="button" class="seg-btn active" data-mode="auto">Automatic</button>
+                <button type="button" class="seg-btn" data-mode="manual">Manual</button>
+              </div>
+              <button id="clearManualComponents" class="ghost-btn compact-btn" type="button">Clear Manual</button>
+            </div>
+            <div id="manualComponentControls" class="manual-controls hidden">
+              <label class="select-field" for="manualBatteryAh">
+                <span>Battery Bank</span>
+                <select id="manualBatteryAh"></select>
+              </label>
+              <label class="select-field" for="manualSolarWatts">
+                <span>Solar Panels</span>
+                <select id="manualSolarWatts"></select>
+              </label>
+              <label class="select-field" for="manualSolarChargerAmps">
+                <span>Solar Charger</span>
+                <select id="manualSolarChargerAmps"></select>
+              </label>
+              <label class="select-field" for="manualAlternatorWatts">
+                <span>Alternator Charge</span>
+                <select id="manualAlternatorWatts"></select>
+              </label>
+              <label class="select-field" for="manualShoreAmps">
+                <span>Shore Charger</span>
+                <select id="manualShoreAmps"></select>
+              </label>
+              <label class="select-field" for="manualInverterWatts">
+                <span>Inverter</span>
+                <select id="manualInverterWatts"></select>
+              </label>
+            </div>
+            <div class="component-grid">
+              <article class="component-item">
+                <p>Battery Bank <span id="componentBatteryMode" class="mode-pill">Auto</span></p>
+                <strong id="componentBattery">0 Ah</strong>
+                <span id="componentBatteryNote">Based on your autonomy target.</span>
+              </article>
+              <article class="component-item">
+                <p>Solar Panels <span id="componentSolarMode" class="mode-pill">Auto</span></p>
+                <strong id="componentSolar">0 W</strong>
+                <span id="componentSolarNote">To offset your average daily load.</span>
+              </article>
+              <article class="component-item">
+                <p>Solar Charger <span id="componentSolarChargerMode" class="mode-pill">Auto</span></p>
+                <strong id="componentSolarCharger">0 A MPPT</strong>
+                <span id="componentSolarChargerNote">Estimated controller size.</span>
+              </article>
+              <article class="component-item">
+                <p>Alternator Charge <span id="componentAlternatorMode" class="mode-pill">Auto</span></p>
+                <strong id="componentAlternator">0 W DC-DC</strong>
+                <span id="componentAlternatorNote">Based on your driving pattern.</span>
+              </article>
+              <article class="component-item">
+                <p>Shore Charger <span id="componentShoreMode" class="mode-pill">Auto</span></p>
+                <strong id="componentShore">0 A</strong>
+                <span id="componentShoreNote">Typical overnight recharge target.</span>
+              </article>
+              <article class="component-item">
+                <p>Inverter <span id="componentInverterMode" class="mode-pill">Auto</span></p>
+                <strong id="componentInverter">0 W</strong>
+                <span id="componentInverterNote">Estimated AC headroom.</span>
+              </article>
+            </div>
+          </section>
+
+          <section class="runway-card">
+            <h3>Battery Runway</h3>
+            <div class="runway-metrics">
+              <div>
+                <p>No recharge</p>
+                <strong id="runtimeNoCharge">0 days</strong>
+              </div>
+              <div>
+                <p>With recharge</p>
+                <strong id="runtimeWithRecharge">0 days</strong>
+              </div>
+            </div>
+            <p id="runwayText" class="runway-text"></p>
+          </section>
+
+          <section class="draws-card">
+            <h3>Biggest Daily Energy Draws</h3>
+            <div id="breakdown" class="breakdown"></div>
+          </section>
+
+          <div id="systemWarnings" class="system-warnings hidden"></div>
+
+          <p class="fine-print">
+            Planning estimates only. Real systems vary with weather, temperature, shading, wiring,
+            and charger/inverter behavior.
+          </p>
+        </aside>
+      </div>
+    </main>
+
+    <div id="mapModal" class="map-modal hidden" aria-hidden="true">
+      <div class="map-dialog" role="dialog" aria-modal="true" aria-labelledby="mapDialogTitle">
+        <div class="map-header">
+          <h3 id="mapDialogTitle">Pin Your Likely Camp Spot</h3>
+          <button id="closeMapModal" type="button" class="ghost-btn compact-btn">Close</button>
+        </div>
+        <p id="mapDialogCopy" class="map-copy">
+          Pick your month in the fridge card, then click where you will spend most time. This
+          helps estimate likely fridge draw more accurately than city-level assumptions.
+        </p>
+        <div id="precisionMap" class="precision-map"></div>
+        <p id="mapSelectionLabel" class="map-selection">No location pinned yet.</p>
+      </div>
+    </div>
+  </body>
+</html>
