@@ -3,8 +3,8 @@ const DEVICE_LIBRARY = [
     id: "fridge",
     name: "12V Fridge",
     watts: 45,
-    dutyFactor: 0.38,
-    note: "Compressor cycling phase.",
+    dutyFactor: 0.26,
+    note: "Compressor cycling phase. Override via settings fridgeDutyFactor.",
     fixedDailyHours: 24,
     maxHours: 24,
     step: 0.5,
@@ -27,8 +27,8 @@ const DEVICE_LIBRARY = [
     id: "induction",
     name: "Induction Cooktop",
     watts: 1300,
-    dutyFactor: 1,
-    note: "Short bursts add up quickly.",
+    dutyFactor: 0.65,
+    note: "65% duty models burner cycling at medium-high power.",
     maxHours: 2,
     step: 0.1,
     defaultOn: false,
@@ -686,12 +686,11 @@ function estimateDaytimeTemperatureFromPrecision() {
   const seasonalPeak = lat >= 0 ? ((7 - 1) / 12) * Math.PI * 2 : 0;
   const latAbs = Math.abs(lat);
 
-  const annualMean = 82 - latAbs * 0.88 - (elevationFt / 1000) * 3.6;
-  const seasonalAmplitude = clamp(8 + latAbs * 0.48, 8, 35);
+  const annualMeanHigh = 88 - latAbs * 0.65 - (elevationFt / 1000) * 3.6;
+  const seasonalAmplitude = clamp(2 + latAbs * 0.6, 2, 35);
   const seasonalOffset = seasonalAmplitude * Math.cos(monthAngle - seasonalPeak);
-  const daytimeBoost = clamp(5 + (90 - latAbs) * 0.03, 3.5, 8.5);
 
-  return clamp(annualMean + seasonalOffset + daytimeBoost, -10, 118);
+  return clamp(annualMeanHigh + seasonalOffset, -10, 118);
 }
 
 function applyPrecisionTemperatureEstimate() {
@@ -975,21 +974,20 @@ async function resolveFridgeElevationFromPin(lat, lon) {
   calculate();
 }
 
-function alternatorEffectiveWh(powerWatts, driveHours, efficiencyFactor) {
-  // DC-DC chargers deliver full bulk power for roughly the first hour,
-  // then taper into absorption/float as the battery fills. Model this
-  // as full output for the first bulkHours, then declining to ~60% for
-  // the remainder. This prevents long-drive estimates from being
-  // unrealistically optimistic.
+function alternatorEffectiveHours(driveHours) {
+  // Returns taper-adjusted equivalent full-power hours for a given drive
+  // duration. DC-DC chargers deliver full bulk power for the first hour,
+  // then taper to ~60% as the battery fills into absorption/float.
   const bulkHours = 1.0;
-  if (driveHours <= bulkHours) {
-    return powerWatts * driveHours * efficiencyFactor;
-  }
-  const bulkWh = powerWatts * bulkHours * efficiencyFactor;
-  const taperHours = driveHours - bulkHours;
   const taperFactor = 0.6;
-  const taperWh = powerWatts * taperHours * efficiencyFactor * taperFactor;
-  return bulkWh + taperWh;
+  if (driveHours <= bulkHours) {
+    return driveHours;
+  }
+  return bulkHours + (driveHours - bulkHours) * taperFactor;
+}
+
+function alternatorEffectiveWh(powerWatts, driveHours, efficiencyFactor) {
+  return powerWatts * alternatorEffectiveHours(driveHours) * efficiencyFactor;
 }
 
 function getSolarSunHoursModel() {
@@ -2494,6 +2492,37 @@ function wirePresetButtons() {
   });
 }
 
+function computeOvernightWh() {
+  // Estimate actual nighttime energy draw (~10 hour window) instead of
+  // using an arbitrary fraction of total daily Wh. This gives a more
+  // realistic overnight battery floor for the recharge-adjusted sizing.
+  const nightHours = 10;
+  const fridgeModel = computeFridgeThermalModel();
+  let overnightWh = 0;
+
+  DEVICE_LIBRARY.forEach((device) => {
+    const load = state.loads[device.id];
+    if (!load || !load.enabled) return;
+
+    if (device.id === "fridge") {
+      // Fridge runs 24h; nighttime share is nightHours/24
+      overnightWh += fridgeModel.dailyWh * (nightHours / 24);
+    } else if (device.id === "heaterFan") {
+      // Heater runs primarily at night — cap at nightHours
+      const watts = getDeviceWatts(device, load);
+      const dutyFactor = getDeviceDutyFactor(device);
+      overnightWh += watts * Math.min(load.hours, nightHours) * dutyFactor;
+    } else if (load.hours >= 24) {
+      // 24h loads (e.g. Starlink always-on) contribute their night share
+      const watts = getDeviceWatts(device, load);
+      const dutyFactor = getDeviceDutyFactor(device);
+      overnightWh += watts * nightHours * dutyFactor;
+    }
+  });
+
+  return overnightWh;
+}
+
 function computeBreakdown() {
   const fridgeModel = computeFridgeThermalModel();
   const entries = [];
@@ -2518,9 +2547,10 @@ function computeBreakdown() {
 
     if (AC_LOAD_IDS.has(device.id)) {
       acDailyWh += dailyWh;
-      // Sum hours across AC devices — the inverter stays on while any
-      // AC load is active, and different devices may run at different times.
-      acTotalHours += load.hours;
+      // Track the longest-running AC device — the inverter idles for
+      // that window since devices typically overlap rather than run
+      // back-to-back across the day.
+      acTotalHours = Math.max(acTotalHours, load.hours);
     }
   });
 
@@ -2600,7 +2630,7 @@ function calculate() {
   const effectiveDod = dod * coldDerating;
   const noRechargeWh = (totalDailyWh * state.autonomyDays) / effectiveDod;
 
-  const overnightFloorWh = totalDailyWh * 0.2;
+  const overnightFloorWh = computeOvernightWh();
   const rechargeAdjustedDraw = Math.max(totalDailyWh - rechargeWh, overnightFloorWh);
   const rechargeWhRecommendation = (rechargeAdjustedDraw * state.autonomyDays) / effectiveDod;
 
@@ -2671,10 +2701,11 @@ function calculate() {
   }
 
   const batteryAutoAh = pickTier(Math.ceil(recommendedAhNoRecharge), state.componentTiers.batteryAh);
+  const solarSafetyMargin = 1.25;
   const solarAutoWatts =
     totalDailyWh > 0
       ? pickTier(
-          Math.ceil(totalDailyWh / Math.max(estimatedSunHours * solarEfficiencyFactor, 0.1)),
+          Math.ceil(solarSafetyMargin * totalDailyWh / Math.max(estimatedSunHours * solarEfficiencyFactor, 0.1)),
           state.componentTiers.solarWatts
         )
       : 0;
@@ -2693,7 +2724,7 @@ function calculate() {
     state.alternator.driveHoursDay > 0 && alternatorNeedWh > 0
       ? pickTier(
           Math.ceil(
-            alternatorNeedWh / Math.max(state.alternator.driveHoursDay * alternatorEfficiencyFactor, 0.1)
+            alternatorNeedWh / Math.max(alternatorEffectiveHours(state.alternator.driveHoursDay) * alternatorEfficiencyFactor, 0.1)
           ),
           state.componentTiers.alternatorWatts
         )
@@ -2747,7 +2778,7 @@ function calculate() {
     solarSelected.value > 0 ? `${solarSelected.value} W` : "No solar panels";
   byId("componentSolarNote").textContent = solarSelected.manual
     ? "Manual override enabled for solar array size."
-    : `Modeled with ${estimatedSunHours.toFixed(1)} sun-hr/day and ${state.solar.efficiencyPct}% efficiency (${sunHoursModel.usingPvWatts ? "PVWatts monthly model" : "manual baseline"}).`;
+    : `Modeled with ${estimatedSunHours.toFixed(1)} sun-hr/day and ${state.solar.efficiencyPct}% efficiency + 25% safety margin (${sunHoursModel.usingPvWatts ? "PVWatts monthly model" : "manual baseline"}).`;
 
   byId("componentSolarCharger").textContent =
     solarChargerSelected.value > 0 ? `${solarChargerSelected.value} A MPPT` : "No MPPT";
@@ -2845,6 +2876,16 @@ function updateSystemWarnings(totalDailyWh, acPeakWatts, dailyAh, coldDerating, 
   // Cold weather charging warning for LiFePO4
   if (state.chemistry === "lifepo4" && state.fridgeAverageTempF < 32) {
     warnings.push("LiFePO4 batteries cannot safely charge below 32\u00B0F (0\u00B0C) without a heated battery system. Factor in a battery heater or insulated box.");
+  }
+
+  // Summer sizing warning — high temps with A/C
+  if (state.fridgeAverageTempF > 90 && state.loads.ac && state.loads.ac.enabled) {
+    warnings.push("Summer sizing alert: temperatures above 90\u00B0F with A/C enabled will dominate your energy budget. Consider increasing solar and battery capacity beyond the baseline recommendation.");
+  }
+
+  // Winter sizing warning — cold temps
+  if (state.fridgeAverageTempF < 40) {
+    warnings.push("Winter sizing alert: temperatures below 40\u00B0F reduce battery capacity and increase heater draw. Plan for shorter autonomy or a larger battery bank.");
   }
 
   const container = byId("systemWarnings");

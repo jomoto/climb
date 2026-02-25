@@ -1102,6 +1102,22 @@ select {
   line-height: 1.42;
 }
 
+.sizing-footnote {
+  margin: 0.6rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.76rem;
+  line-height: 1.42;
+  background: rgba(42, 111, 151, 0.1);
+  color: #1a5276;
+  border-left: 3px solid var(--sky);
+}
+
+body[data-theme="dark"] .sizing-footnote {
+  background: rgba(130, 183, 223, 0.12);
+  color: #a8cff0;
+}
+
 .system-warnings {
   margin-top: 0.75rem;
   display: flex;
