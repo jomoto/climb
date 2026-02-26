@@ -1,0 +1,15 @@
+# OpenAI crawlers
+User-agent: GPTBot
+Disallow: /map.html
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+# Everyone else
+User-agent: *
+Allow: /
+
+Sitemap: https://shinojomoto.com/sitemap.xml
