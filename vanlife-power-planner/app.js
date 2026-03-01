@@ -1723,6 +1723,18 @@ function wireSolarPrecisionControls() {
 
   yes.addEventListener("click", () => {
     state.solarPrecision.enabled = true;
+    if (state.fridgePrecision.enabled) {
+      state.solarPrecision.month = state.fridgePrecision.month;
+      monthSelect.value = String(state.solarPrecision.month);
+    }
+    if (!state.solarPrecision.hasPinned && state.fridgePrecision.hasPinned) {
+      state.solarPrecision.lat = state.fridgePrecision.lat;
+      state.solarPrecision.lon = state.fridgePrecision.lon;
+      state.solarPrecision.hasPinned = true;
+      state.solarPrecision.monthlySunHours = null;
+      state.solarPrecision.lastFetchedKey = "";
+      state.solarPrecision.status = "idle";
+    }
     refreshSolarPrecisionUi();
     ensureSolarPrecisionData();
     calculate();
