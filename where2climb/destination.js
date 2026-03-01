@@ -4,8 +4,6 @@ import {
   getDestinationById,
   getGoodMonths,
 } from "./data.js";
-import { EUROPE_TOP2_DESTINATIONS } from "./europeTop2Destinations.js";
-
 const params = new URLSearchParams(window.location.search);
 const destinationId = params.get("id");
 const requestedMonth = params.get("month");
@@ -19,9 +17,7 @@ const detailMonth = document.querySelector("#detailMonth");
 const detailAllMonths = document.querySelector("#detailAllMonths");
 const detailSources = document.querySelector("#detailSources");
 
-const destination =
-  getDestinationById(destinationId) ||
-  EUROPE_TOP2_DESTINATIONS.find((d) => d.id === destinationId);
+const destination = getDestinationById(destinationId);
 
 if (!destination) {
   detailRoot.innerHTML = `

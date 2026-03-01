@@ -9,7 +9,6 @@ import {
   rockTypeMatches,
   pitchTypeMatches,
 } from "./data.js";
-import { EUROPE_TOP2_DESTINATIONS } from "./europeTop2Destinations.js";
 
 const ALLOWED_STYLES = new Set(["all", "trad", "sport"]);
 const ALLOWED_ROCKS = new Set(["all", "granite", "limestone", "sandstone", "volcanic", "other"]);
@@ -51,7 +50,6 @@ L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
 }).addTo(map);
 
-const ALL_DESTINATIONS = dedupeDestinationLists(DESTINATIONS, EUROPE_TOP2_DESTINATIONS);
 const markerLayer = L.layerGroup().addTo(map);
 
 const MARKER_COLORS = {
@@ -124,7 +122,7 @@ function render() {
 }
 
 function getFilteredDestinations() {
-  return ALL_DESTINATIONS.filter((destination) => {
+  return DESTINATIONS.filter((destination) => {
     if (!styleMatches(destination, state.style)) return false;
     if (!rockTypeMatches(destination, state.rockType)) return false;
     if (!pitchTypeMatches(destination, state.pitch)) return false;
@@ -225,28 +223,4 @@ function syncQueryParams() {
   nextParams.set("rock", state.rockType);
   nextParams.set("pitch", state.pitch);
   window.history.replaceState(null, "", `${window.location.pathname}?${nextParams.toString()}`);
-}
-
-function dedupeDestinationLists(primary, additions) {
-  const seenIds = new Set();
-  const seenUrls = new Set();
-  const merged = [];
-
-  for (const destination of primary) {
-    seenIds.add(destination.id);
-    if (destination.mpAreaUrl) seenUrls.add(destination.mpAreaUrl);
-    merged.push(destination);
-  }
-
-  for (const destination of additions) {
-    const duplicateId = destination.id && seenIds.has(destination.id);
-    const duplicateUrl = destination.mpAreaUrl && seenUrls.has(destination.mpAreaUrl);
-    if (duplicateId || duplicateUrl) continue;
-
-    seenIds.add(destination.id);
-    if (destination.mpAreaUrl) seenUrls.add(destination.mpAreaUrl);
-    merged.push(destination);
-  }
-
-  return merged;
 }
