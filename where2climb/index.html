@@ -3,12 +3,79 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ClimbGlobe - Where to Climb, Month by Month</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9968;</text></svg>" />
-    <script type="module" crossorigin src="/where2climb/assets/index-nw9toAu_.js"></script>
-    <link rel="stylesheet" crossorigin href="/where2climb/assets/index-hGRmhnpC.css">
+    <title>Climb Atlas Planner</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
-    <div id="root"></div>
+  <body class="map-page">
+    <header class="topbar">
+      <div class="brand-block">
+        <h1>Where2Climb</h1>
+      </div>
+
+      <div class="top-controls">
+        <label class="filter-group" for="monthSelect">
+          <span>Month</span>
+          <select id="monthSelect" aria-label="Choose month"></select>
+        </label>
+
+        <label class="filter-group" for="styleSelect">
+          <span>Type</span>
+          <select id="styleSelect" aria-label="Choose climbing type">
+            <option value="all">All Types</option>
+            <option value="sport">Sport</option>
+            <option value="trad">Trad</option>
+          </select>
+        </label>
+
+        <label class="filter-group" for="rockSelect">
+          <span>Rock</span>
+          <select id="rockSelect" aria-label="Choose rock type">
+            <option value="all">All Rock</option>
+            <option value="granite">Granite</option>
+            <option value="limestone">Limestone</option>
+            <option value="sandstone">Sandstone</option>
+            <option value="volcanic">Volcanic</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+
+        <div class="filter-group">
+          <span>Pitch</span>
+          <div class="pitch-toggle" id="pitchToggle" role="radiogroup" aria-label="Choose pitch type">
+            <button class="pitch-btn active" data-pitch="all">All</button>
+            <button class="pitch-btn" data-pitch="single">Single</button>
+            <button class="pitch-btn" data-pitch="multi">Multi</button>
+          </div>
+        </div>
+
+        <div class="filter-group count-group">
+          <span>Results</span>
+          <div class="count-pill" id="destinationCount">0 destinations</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="map-stage" aria-label="Global climbing map">
+      <div id="map"></div>
+
+      <div class="map-legend" id="mapLegend" aria-label="Marker legend">
+        <span><i class="dot dot-sport"></i> Sport</span>
+        <span><i class="dot dot-trad"></i> Trad</span>
+        <span><i class="dot dot-mixed"></i> Both</span>
+      </div>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

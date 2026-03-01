@@ -1,0 +1,522 @@
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600&display=swap");
+
+:root {
+  --bg: #070d1b;
+  --bg-soft: #0f1730;
+  --panel: #171f38;
+  --panel-2: #1f2742;
+  --line: #2a3558;
+  --line-soft: #253053;
+  --text: #e8ecf5;
+  --muted: #9ea8bf;
+  --sport: #ff8a2a;
+  --trad: #4a8dff;
+  --both: #a05cff;
+  --peak: #20d072;
+  --good: #f3aa1a;
+  --off: #5f6680;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at 20% -10%, #1a2649 0%, var(--bg) 42%, #050912 100%);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: "Sora", "Space Grotesk", sans-serif;
+  letter-spacing: 0.01em;
+}
+
+p {
+  margin: 0.35rem 0 0;
+  line-height: 1.45;
+}
+
+a {
+  color: #8ab7ff;
+}
+
+/* MAP PAGE */
+.map-page {
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.topbar {
+  height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 1.4rem;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(10, 16, 34, 0.94);
+  backdrop-filter: blur(10px);
+}
+
+.brand-block h1 {
+  font-size: clamp(1.45rem, 2vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.top-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.8rem;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.filter-group {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.filter-group span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+select {
+  min-width: 152px;
+  border: 1px solid var(--line);
+  background: #111935;
+  color: var(--text);
+  border-radius: 11px;
+  padding: 0.55rem 0.75rem;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.pitch-toggle {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  overflow: hidden;
+  min-height: 42px;
+}
+
+.pitch-btn {
+  all: unset;
+  padding: 0.45rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-right: 1px solid var(--line);
+  background: #111935;
+  text-align: center;
+  min-width: 50px;
+}
+
+.pitch-btn:last-child {
+  border-right: none;
+}
+
+.pitch-btn.active {
+  background: #1f2c52;
+  color: var(--text);
+}
+
+.pitch-btn:hover:not(.active) {
+  background: #171f3a;
+}
+
+.count-pill {
+  border: 1px solid #33406a;
+  border-radius: 999px;
+  padding: 0.55rem 0.95rem;
+  min-height: 47px;
+  display: inline-flex;
+  align-items: center;
+  color: #c2cbe0;
+  background: #151e3a;
+  font-weight: 600;
+}
+
+.count-group {
+  min-width: 180px;
+}
+
+.map-stage {
+  position: relative;
+  height: calc(100vh - 92px);
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+.map-legend {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--line);
+  background: rgba(20, 28, 52, 0.9);
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+  font-size: 0.92rem;
+  color: #c3cae0;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+}
+
+.dot-sport {
+  background: var(--sport);
+}
+
+.dot-trad {
+  background: var(--trad);
+}
+
+.dot-mixed {
+  background: var(--both);
+}
+
+.destination-tooltip {
+  border: 1px solid #2f3b63;
+  background: #111933;
+  color: #e6ebf7;
+  border-radius: 8px;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.leaflet-tooltip-top:before {
+  border-top-color: #111933;
+}
+
+.leaflet-control-zoom a {
+  background: #10172f;
+  color: #dce3f4;
+  border-color: #2d375d;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #1c2748;
+}
+
+.leaflet-control-attribution {
+  background: rgba(10, 14, 26, 0.75);
+  color: #9aa5c4;
+}
+
+/* DETAIL PAGE */
+.detail-page {
+  min-height: 100vh;
+  padding: 1.2rem 0;
+}
+
+.detail-shell {
+  width: min(1320px, calc(100vw - 2rem));
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.back-link {
+  width: fit-content;
+  text-decoration: none;
+  font-weight: 600;
+  color: #9ec0ff;
+}
+
+.detail-hero,
+.detail-month,
+.detail-metrics,
+.detail-all-months,
+.detail-sources {
+  background: linear-gradient(180deg, rgba(31, 40, 67, 0.88) 0%, rgba(22, 30, 52, 0.92) 100%);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+
+.detail-hero h1 {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: 700;
+}
+
+.detail-subtitle {
+  color: #b7c1d8;
+  font-size: clamp(1rem, 1.8vw, 1.2rem);
+  margin-top: 0.25rem;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.95rem;
+}
+
+.chip {
+  border: 1px solid #31406b;
+  background: #1a2443;
+  border-radius: 999px;
+  padding: 0.36rem 0.8rem;
+  font-size: 0.95rem;
+  color: #d8e1f4;
+  font-weight: 600;
+}
+
+.season-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.season-selected {
+  margin-top: 0;
+  color: #b8c2dd;
+  font-weight: 600;
+}
+
+.season-head h2,
+.detail-metrics h2,
+.detail-all-months h2,
+.detail-sources h2 {
+  font-size: 1.22rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #99a5c4;
+}
+
+.season-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.season-cell {
+  border: 1px solid #2d375b;
+  border-radius: 10px;
+  padding: 0.7rem 0.35rem;
+  display: grid;
+  justify-items: center;
+  background: #1a2342;
+}
+
+.month-name {
+  font-weight: 700;
+  color: #d2daed;
+}
+
+.season-cell.peak {
+  border-color: rgba(32, 208, 114, 0.65);
+  background: rgba(32, 208, 114, 0.18);
+}
+
+.season-cell.good {
+  border-color: rgba(243, 170, 26, 0.65);
+  background: rgba(243, 170, 26, 0.16);
+}
+
+.season-cell.off {
+  opacity: 0.8;
+}
+
+.season-cell.selected {
+  box-shadow: inset 0 0 0 2px #ffffff;
+}
+
+.season-legend-row {
+  margin-top: 0.65rem;
+  display: flex;
+  gap: 1rem;
+  color: #b8c2dc;
+  font-size: 0.92rem;
+}
+
+.legend-peak {
+  background: var(--peak);
+}
+
+.legend-good {
+  background: var(--good);
+}
+
+.legend-off {
+  background: var(--off);
+}
+
+.stats-card {
+  width: min(820px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.05rem;
+  background: var(--panel-2);
+}
+
+.stats-grid {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1.1rem;
+}
+
+.stats-grid h3 {
+  color: #7f8aa7;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.stats-grid p {
+  margin-top: 0.18rem;
+  font-size: 1.08rem;
+  color: #e7ecf9;
+  font-weight: 600;
+}
+
+.overview-note {
+  color: #9ca7c2;
+  margin-top: 0.8rem;
+}
+
+.classic-routes-card {
+  margin-top: 0.75rem;
+}
+
+.classic-routes-list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+}
+
+.classic-route {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.classic-route:last-child {
+  border-bottom: none;
+}
+
+.route-name {
+  font-weight: 600;
+  color: #e7ecf9;
+  font-size: 1.02rem;
+}
+
+.route-meta {
+  color: #9ea8bf;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  margin-left: 1rem;
+}
+
+.source-list {
+  margin: 0.65rem 0 0;
+  padding-left: 1rem;
+}
+
+.source-list li {
+  margin-bottom: 0.4rem;
+  color: #b8c2dd;
+}
+
+@media (max-width: 1024px) {
+  .topbar {
+    height: auto;
+    align-items: flex-start;
+    flex-direction: column;
+    padding-bottom: 1rem;
+  }
+
+  .top-controls {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .map-stage {
+    height: calc(100vh - 146px);
+  }
+
+  .season-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    padding: 0.75rem;
+  }
+
+  .brand-block h1 {
+    font-size: 1.35rem;
+  }
+
+  .top-controls {
+    gap: 0.55rem;
+  }
+
+  .filter-group,
+  .count-group {
+    width: 100%;
+  }
+
+  select {
+    width: 100%;
+  }
+
+  .map-stage {
+    height: calc(100vh - 234px);
+  }
+
+  .map-legend {
+    font-size: 0.82rem;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .detail-shell {
+    width: calc(100vw - 1rem);
+  }
+
+  .season-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .season-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
