@@ -5,7 +5,6 @@ import {
   isPrimeMonth,
   isGoodMonth,
   monthScore,
-  computeStyle,
   styleMatches,
   rockTypeMatches,
   pitchTypeMatches,
@@ -237,6 +236,33 @@ function renderCount(count) {
 
 function markerColor(style) {
   return MARKER_COLORS[style] || MARKER_COLORS.mixed;
+}
+
+function computeStyle(destination) {
+  const rc = destination.routeCounts || {};
+  const total = Object.values(rc).reduce((sum, value) => sum + (Number(value) || 0), 0);
+
+  if (total > 0) {
+    const boulderPct = (Number(rc.boulder) || 0) / total;
+    const tradPct = (Number(rc.trad) || 0) / total;
+    const sportPct = (Number(rc.sport) || 0) / total;
+
+    if (boulderPct > 0.7) return "boulder";
+    if (tradPct > 0.9) return "trad";
+    if (sportPct > 0.9) return "sport";
+  }
+
+  if (destination.predominantStyle) {
+    if (["sport", "trad", "boulder"].includes(destination.predominantStyle)) {
+      return destination.predominantStyle;
+    }
+  }
+
+  if (Array.isArray(destination.styles) && destination.styles.length > 0) {
+    return destination.styles[0];
+  }
+
+  return "mixed";
 }
 
 function updateLegend(monthSelected) {
