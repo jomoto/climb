@@ -8,6 +8,19 @@ const params = new URLSearchParams(window.location.search);
 const destinationId = params.get("id");
 const requestedMonth = params.get("month");
 const requestedStyle = params.get("style") || "all";
+const requestedRock = params.get("rock") || "all";
+const requestedPitch = params.get("pitch") || "all";
+const requestedLat = params.get("lat");
+const requestedLng = params.get("lng");
+const requestedZoom = params.get("zoom");
+
+const ALLOWED_STYLES = new Set(["all", "trad", "sport", "boulder", "mixed"]);
+const ALLOWED_ROCKS = new Set(["all", "granite", "limestone", "sandstone", "volcanic", "other"]);
+const ALLOWED_PITCH = new Set(["all", "single", "multi"]);
+
+function sanitizeQueryValue(value, allowed, fallback) {
+  return allowed.has(value) ? value : fallback;
+}
 
 const detailRoot = document.querySelector("#detailRoot");
 const backToMap = document.querySelector("#backToMap");
@@ -18,6 +31,118 @@ const detailAllMonths = document.querySelector("#detailAllMonths");
 const detailSources = document.querySelector("#detailSources");
 
 const destination = getDestinationById(destinationId);
+
+const safeStyle = sanitizeQueryValue(requestedStyle, ALLOWED_STYLES, "all");
+const safeRock = sanitizeQueryValue(requestedRock, ALLOWED_ROCKS, "all");
+const safePitch = sanitizeQueryValue(requestedPitch, ALLOWED_PITCH, "all");
+
+const COUNTRY_BY_ID = {
+  ailefroide: "France",
+  "bow-valley": "Canada",
+  bugaboos: "Canada",
+  ceuse: "France",
+  chamonix: "France",
+  "costa-blanca": "Spain",
+  dolomites: "Italy",
+  "el-potrero-chico": "Mexico",
+  "el-salto": "Mexico",
+  "finale-ligure": "Italy",
+  frankenjura: "Germany",
+  "hatun-machay": "Peru",
+  kalymnos: "Greece",
+  lofoten: "Norway",
+  "mineral-del-chico": "Mexico",
+  paklenica: "Croatia",
+  "pena-de-bernal": "Mexico",
+  siurana: "Spain",
+  "skaha-bluffs": "Canada",
+  squamish: "Canada",
+  "todra-gorge": "Morocco",
+  "valle-dellorco": "Italy",
+  "verdon-gorge": "France",
+  arco: "Italy",
+  tafraoute: "Morocco",
+  margalef: "Spain",
+  leonidio: "Greece",
+  "mount-arapiles": "Australia",
+  liming: "China",
+  tsaranoro: "Madagascar",
+  "blue-mountains-au": "Australia",
+  "waterval-boven": "South Africa",
+  nowra: "Australia",
+  "frog-buttress": "Australia",
+  ogawayama: "Japan",
+  "wadi-rum": "Jordan",
+  albarracin: "Spain",
+  rodellar: "Spain",
+  alcaniz: "Spain",
+  quiros: "Spain",
+  fontainebleau: "France",
+  briancon: "France",
+  "les-calanques": "France",
+  buoux: "France",
+  tarn: "France",
+  cadarese: "Italy",
+  ogliastra: "Italy",
+  "val-di-mello": "Italy",
+  meteora: "Greece",
+  "athens-crags": "Greece",
+  lagada: "Greece",
+  bohuslan: "Sweden",
+  skien: "Norway",
+  vingsand: "Norway",
+  aland: "Finland",
+  "peak-district": "United Kingdom",
+  osp: "Slovenia",
+  omis: "Croatia",
+  "magic-wood": "Switzerland",
+  geyikbayiri: "Türkiye",
+  aladaglar: "Türkiye",
+  quetzaltenango: "Guatemala",
+  "cerro-quemado": "Guatemala",
+  itatim: "Brazil",
+  "el-chonta": "Peru",
+  yangshuo: "China",
+  palchan: "India",
+  aleo: "India",
+  "chichoga-road": "India",
+  "solang-valley": "India",
+  mizugaki: "Japan",
+  rocklands: "South Africa",
+  "djebel-zaghouan": "Tunisia",
+  "djebel-ressas": "Tunisia",
+  "oman-climbing": "Oman",
+  grampians: "Australia",
+  wanaka: "New Zealand",
+  "the-remarkables": "New Zealand",
+  "castle-hill": "New Zealand",
+  flatanger: "Norway",
+  "piedra-parada": "Argentina",
+  "serra-do-cipo": "Brazil",
+  "valle-de-los-condores": "Argentina",
+  "railay-tonsai": "Thailand",
+  longdong: "Taiwan",
+  "paynes-ford": "New Zealand",
+  "rocha-da-pena": "Portugal",
+  corsica: "France",
+  "valle-cochamo": "Chile",
+  frey: "Argentina",
+  "los-arenales": "Argentina",
+  suesca: "Colombia",
+  "chalten-massif": "Argentina",
+  "banff-national-park": "Canada",
+  riglos: "Spain",
+  "la-pedriza": "Spain",
+  cresciano: "Switzerland",
+  chironico: "Switzerland",
+  varazze: "Italy",
+  hampi: "India",
+  gastlosen: "Switzerland",
+  wendenstocke: "Switzerland",
+  "eldorado-grimsel": "Switzerland",
+  salbitschijen: "Switzerland",
+  lehn: "Switzerland",
+};
 
 if (!destination) {
   detailRoot.innerHTML = `
@@ -48,7 +173,7 @@ if (!destination) {
     detailHero.innerHTML = `
       <h1>${escapeHtml(destination.name)}</h1>
       <p class="detail-subtitle">${escapeHtml(destination.mpAreaTitle)} (${escapeHtml(
-            destination.region
+            locationLabel(destination)
           )})</p>
       <div class="chip-row">
         <span class="chip">${escapeHtml(humanStyle(destination.predominantStyle))}</span>
@@ -143,9 +268,25 @@ if (!destination) {
   }
 
   function updateBackLink() {
-    backToMap.href = `./index.html?month=${encodeURIComponent(state.month)}&style=${encodeURIComponent(
-      requestedStyle
-    )}`;
+    const backParams = new URLSearchParams();
+    backParams.set("month", requestedMonth || "all");
+    backParams.set("style", safeStyle);
+    backParams.set("rock", safeRock);
+    backParams.set("pitch", safePitch);
+
+    if (requestedLat && Number.isFinite(Number(requestedLat))) {
+      backParams.set("lat", requestedLat);
+    }
+
+    if (requestedLng && Number.isFinite(Number(requestedLng))) {
+      backParams.set("lng", requestedLng);
+    }
+
+    if (requestedZoom && Number.isFinite(Number(requestedZoom))) {
+      backParams.set("zoom", requestedZoom);
+    }
+
+    backToMap.href = `./index.html?${backParams.toString()}`;
   }
 }
 
@@ -185,6 +326,15 @@ function humanPitch(pitchType) {
 function isSectorEntry(name) {
   const lower = name.toLowerCase();
   return /\b(sector|routes|area|walls?|crags?|boulders|classics|gorge|cave)\b/.test(lower);
+}
+
+function locationLabel(destination) {
+  const region = destination.region || "";
+  if (typeof region === "string" && region.toLowerCase() !== "international") {
+    return region;
+  }
+
+  return COUNTRY_BY_ID[destination.id] || region || "Unknown";
 }
 
 function escapeHtml(value) {
