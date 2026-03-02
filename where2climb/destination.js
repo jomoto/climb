@@ -4,6 +4,7 @@ import {
   getDestinationById,
   getGoodMonths,
 } from "./data.js";
+
 const params = new URLSearchParams(window.location.search);
 const destinationId = params.get("id");
 const requestedMonth = params.get("month");
@@ -17,9 +18,37 @@ const requestedZoom = params.get("zoom");
 const ALLOWED_STYLES = new Set(["all", "trad", "sport", "boulder", "mixed"]);
 const ALLOWED_ROCKS = new Set(["all", "granite", "limestone", "sandstone", "volcanic", "other"]);
 const ALLOWED_PITCH = new Set(["all", "single", "multi"]);
+const BACK_STATE_STORAGE_KEY = "where2climb:lastMapState";
+const BACK_STATE_TTL_MS = 12 * 60 * 60 * 1000;
+
+function sanitizeMonth(value) {
+  return MONTHS.some((month) => month.key === value) ? value : null;
+}
 
 function sanitizeQueryValue(value, allowed, fallback) {
   return allowed.has(value) ? value : fallback;
+}
+
+function normalizeNumericValue(value, fallback = null) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? value : fallback;
+}
+
+function getStoredBackState() {
+  try {
+    const rawState = sessionStorage.getItem(BACK_STATE_STORAGE_KEY);
+    if (!rawState) return null;
+
+    const state = JSON.parse(rawState);
+    if (!state || typeof state !== "object") return null;
+
+    const age = Date.now() - (state.updatedAt || 0);
+    if (!Number.isFinite(age) || age > BACK_STATE_TTL_MS) return null;
+
+    return state;
+  } catch {
+    return null;
+  }
 }
 
 function getReferrerParams() {
@@ -59,15 +88,29 @@ const safeRock = sanitizeQueryValue(requestedRock, ALLOWED_ROCKS, "all");
 const safePitch = sanitizeQueryValue(requestedPitch, ALLOWED_PITCH, "all");
 const referrerParams = getReferrerParams();
 const referrerMonth = referrerParams ? referrerParams.get("month") : null;
-const safeReferrerMonth =
-  MONTHS.some((m) => m.key === referrerMonth) ? referrerMonth : null;
-const resolvedMonth = safeReferrerMonth || (MONTHS.some((m) => m.key === requestedMonth) ? requestedMonth : "all");
-const resolvedStyle = sanitizeQueryValue(getReferrerValue(referrerParams, "style"), ALLOWED_STYLES, safeStyle);
-const resolvedRock = sanitizeQueryValue(getReferrerValue(referrerParams, "rock"), ALLOWED_ROCKS, safeRock);
-const resolvedPitch = sanitizeQueryValue(getReferrerValue(referrerParams, "pitch"), ALLOWED_PITCH, safePitch);
-const resolvedLat = referrerParams?.get("lat");
-const resolvedLng = referrerParams?.get("lng");
-const resolvedZoom = referrerParams?.get("zoom");
+const storedState = getStoredBackState();
+const resolvedMonth = sanitizeMonth(referrerMonth) || sanitizeMonth(requestedMonth) || sanitizeMonth(storedState?.month) || "all";
+const resolvedStyle =
+  sanitizeQueryValue(getReferrerValue(referrerParams, "style"), ALLOWED_STYLES, safeStyle) ||
+  sanitizeQueryValue(storedState?.style, ALLOWED_STYLES, safeStyle);
+const resolvedRock =
+  sanitizeQueryValue(getReferrerValue(referrerParams, "rock"), ALLOWED_ROCKS, safeRock) ||
+  sanitizeQueryValue(storedState?.rock, ALLOWED_ROCKS, safeRock);
+const resolvedPitch =
+  sanitizeQueryValue(getReferrerValue(referrerParams, "pitch"), ALLOWED_PITCH, safePitch) ||
+  sanitizeQueryValue(storedState?.pitch, ALLOWED_PITCH, safePitch);
+const resolvedLat =
+  getReferrerValue(referrerParams, "lat") ||
+  requestedLat ||
+  normalizeNumericValue(storedState?.lat);
+const resolvedLng =
+  getReferrerValue(referrerParams, "lng") ||
+  requestedLng ||
+  normalizeNumericValue(storedState?.lng);
+const resolvedZoom =
+  getReferrerValue(referrerParams, "zoom") ||
+  requestedZoom ||
+  normalizeNumericValue(storedState?.zoom);
 
 const COUNTRY_BY_ID = {
   ailefroide: "France",

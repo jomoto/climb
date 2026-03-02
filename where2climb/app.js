@@ -24,11 +24,32 @@ const pitchQuery = params.get("pitch");
 const mapLatQuery = params.get("lat");
 const mapLngQuery = params.get("lng");
 const mapZoomQuery = params.get("zoom");
+const BACK_STATE_STORAGE_KEY = "where2climb:lastMapState";
 
 function toFiniteNumber(value, fallback) {
   if (value === null || value === "") return fallback;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function persistBackState(destinationId, destinationParams, center) {
+  const state = {
+    id: destinationId,
+    month: destinationParams.get("month"),
+    style: destinationParams.get("style"),
+    rock: destinationParams.get("rock"),
+    pitch: destinationParams.get("pitch"),
+    lat: toFiniteNumber(center.lat, null),
+    lng: toFiniteNumber(center.lng, null),
+    zoom: toFiniteNumber(map.getZoom(), null),
+    updatedAt: Date.now(),
+  };
+
+  try {
+    sessionStorage.setItem(BACK_STATE_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage failures (e.g., blocked storage mode).
+  }
 }
 
 const state = {
@@ -202,6 +223,7 @@ function renderMap(destinations) {
       destinationParams.set("lat", center.lat);
       destinationParams.set("lng", center.lng);
       destinationParams.set("zoom", map.getZoom());
+      persistBackState(destination.id, destinationParams, center);
       window.location.href = `./destination.html?${destinationParams.toString()}`;
     });
 
