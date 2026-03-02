@@ -3844,10 +3844,24 @@ export function getDestinationById(id) {
   return DESTINATIONS.find((destination) => destination.id === id);
 }
 
+export function computeStyle(destination) {
+  const rc = destination.routeCounts || {};
+  const total = Object.values(rc).reduce((sum, n) => sum + n, 0);
+  if (total === 0) return "mixed";
+
+  const boulderPct = (rc.boulder || 0) / total;
+  const tradPct = (rc.trad || 0) / total;
+  const sportPct = (rc.sport || 0) / total;
+
+  if (boulderPct > 0.70) return "boulder";
+  if (tradPct > 0.90) return "trad";
+  if (sportPct > 0.90) return "sport";
+  return "mixed";
+}
+
 export function styleMatches(destination, style) {
   if (style === "all") return true;
-  if (style === "boulder") return (destination.routeCounts?.boulder ?? 0) > 0;
-  return destination.styles.includes(style);
+  return computeStyle(destination) === style;
 }
 
 export function monthScore(destination, monthKey) {

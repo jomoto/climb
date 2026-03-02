@@ -5,6 +5,7 @@ import {
   isPrimeMonth,
   isGoodMonth,
   monthScore,
+  computeStyle,
   styleMatches,
   rockTypeMatches,
   pitchTypeMatches,
@@ -157,9 +158,7 @@ function renderMap(destinations) {
       radius = isPeak ? 8 : 7;
       fillOpacity = isPeak ? 0.92 : 0.72;
     } else {
-      const markerType =
-        state.style !== "all" ? state.style : destination.predominantStyle || "mixed";
-      color = markerColor(markerType);
+      color = markerColor(computeStyle(destination));
       radius = 8;
       fillOpacity = 0.92;
     }
