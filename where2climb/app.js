@@ -21,6 +21,15 @@ const monthQuery = params.get("month");
 const styleQuery = params.get("style");
 const rockQuery = params.get("rock");
 const pitchQuery = params.get("pitch");
+const mapLatQuery = params.get("lat");
+const mapLngQuery = params.get("lng");
+const mapZoomQuery = params.get("zoom");
+
+function toFiniteNumber(value, fallback) {
+  if (value === null || value === "") return fallback;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
 
 const state = {
   month:
@@ -42,7 +51,10 @@ const map = L.map("map", {
   minZoom: 2,
   worldCopyJump: true,
   zoomControl: true,
-}).setView([20, 3], 2);
+}).setView(
+  [toFiniteNumber(mapLatQuery, 20), toFiniteNumber(mapLngQuery, 3)],
+  toFiniteNumber(mapZoomQuery, 2)
+);
 
 L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
   maxZoom: 19,
@@ -180,13 +192,17 @@ function renderMap(destinations) {
     });
 
     marker.on("click", () => {
-      const monthForLink =
-        state.month === ALL_MONTH_KEY
-          ? destination.primeMonths[0]
-          : state.month;
-      window.location.href = `./destination.html?id=${encodeURIComponent(
-        destination.id
-      )}&month=${encodeURIComponent(monthForLink)}&style=${encodeURIComponent(state.style)}`;
+      const destinationParams = new URLSearchParams();
+      destinationParams.set("id", destination.id);
+      destinationParams.set("month", state.month);
+      destinationParams.set("style", state.style);
+      destinationParams.set("rock", state.rockType);
+      destinationParams.set("pitch", state.pitch);
+      const center = map.getCenter();
+      destinationParams.set("lat", center.lat);
+      destinationParams.set("lng", center.lng);
+      destinationParams.set("zoom", map.getZoom());
+      window.location.href = `./destination.html?${destinationParams.toString()}`;
     });
 
     marker.addTo(markerLayer);
