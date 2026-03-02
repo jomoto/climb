@@ -29,11 +29,6 @@ function sanitizeQueryValue(value, allowed, fallback) {
   return allowed.has(value) ? value : fallback;
 }
 
-function normalizeNumericValue(value, fallback = null) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? value : fallback;
-}
-
 function getReferrerParams() {
   if (!document.referrer) return null;
 
