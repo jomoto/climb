@@ -11,6 +11,7 @@
   --muted: #9ea8bf;
   --sport: #ff8a2a;
   --trad: #4a8dff;
+  --boulder: #f5d442;
   --both: #a05cff;
   --peak: #20d072;
   --good: #f3aa1a;
@@ -195,6 +196,10 @@ select {
 
 .dot-trad {
   background: var(--trad);
+}
+
+.dot-boulder {
+  background: var(--boulder);
 }
 
 .dot-mixed {

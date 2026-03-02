@@ -55,6 +55,7 @@ const markerLayer = L.layerGroup().addTo(map);
 const MARKER_COLORS = {
   sport: "#ff8a2a",
   trad: "#4a8dff",
+  boulder: "#f5d442",
   mixed: "#a05cff",
 };
 
@@ -211,6 +212,7 @@ function updateLegend(monthSelected) {
     legend.innerHTML = `
       <span><i class="dot dot-sport"></i> Sport</span>
       <span><i class="dot dot-trad"></i> Trad</span>
+      <span><i class="dot dot-boulder"></i> Boulder</span>
       <span><i class="dot dot-mixed"></i> Both</span>
     `;
   }
