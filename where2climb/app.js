@@ -220,9 +220,10 @@ function updateLegend(monthSelected) {
 
 function syncQueryParams() {
   const nextParams = new URLSearchParams();
-  nextParams.set("month", state.month);
-  nextParams.set("style", state.style);
-  nextParams.set("rock", state.rockType);
-  nextParams.set("pitch", state.pitch);
-  window.history.replaceState(null, "", `${window.location.pathname}?${nextParams.toString()}`);
+  if (state.month !== ALL_MONTH_KEY) nextParams.set("month", state.month);
+  if (state.style !== "all") nextParams.set("style", state.style);
+  if (state.rockType !== "all") nextParams.set("rock", state.rockType);
+  if (state.pitch !== "all") nextParams.set("pitch", state.pitch);
+  const qs = nextParams.toString();
+  window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
 }
