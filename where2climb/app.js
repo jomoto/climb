@@ -11,7 +11,7 @@ import {
   pitchTypeMatches,
 } from "./data.js";
 
-const ALLOWED_STYLES = new Set(["all", "trad", "sport", "boulder"]);
+const ALLOWED_STYLES = new Set(["all", "trad", "sport", "boulder", "mixed"]);
 const ALLOWED_ROCKS = new Set(["all", "granite", "limestone", "sandstone", "volcanic", "other"]);
 const ALLOWED_PITCH = new Set(["all", "single", "multi"]);
 const ALL_MONTH_KEY = "all";
@@ -213,7 +213,7 @@ function updateLegend(monthSelected) {
       <span><i class="dot dot-sport"></i> Sport</span>
       <span><i class="dot dot-trad"></i> Trad</span>
       <span><i class="dot dot-boulder"></i> Boulder</span>
-      <span><i class="dot dot-mixed"></i> Both</span>
+      <span><i class="dot dot-mixed"></i> Sport & Trad</span>
     `;
   }
 }
