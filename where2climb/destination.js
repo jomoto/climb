@@ -20,8 +20,10 @@ const ALLOWED_ROCKS = new Set(["all", "granite", "limestone", "sandstone", "volc
 const ALLOWED_PITCH = new Set(["all", "single", "multi"]);
 const BACK_STATE_STORAGE_KEY = "where2climb:lastMapState";
 const BACK_STATE_TTL_MS = 12 * 60 * 60 * 1000;
+const ALL_MONTH_KEY = "all";
 
 function sanitizeMonth(value) {
+  if (value === ALL_MONTH_KEY) return ALL_MONTH_KEY;
   return MONTHS.some((month) => month.key === value) ? value : null;
 }
 
@@ -89,28 +91,36 @@ const safePitch = sanitizeQueryValue(requestedPitch, ALLOWED_PITCH, "all");
 const referrerParams = getReferrerParams();
 const referrerMonth = referrerParams ? referrerParams.get("month") : null;
 const storedState = getStoredBackState();
-const resolvedMonth = sanitizeMonth(referrerMonth) || sanitizeMonth(requestedMonth) || sanitizeMonth(storedState?.month) || "all";
+const hasStoredState = Boolean(storedState && storedState.id === destinationId);
+const storedMonth = hasStoredState ? sanitizeMonth(storedState.month) : null;
+const storedStyle = hasStoredState ? storedState.style : null;
+const storedRock = hasStoredState ? storedState.rock : null;
+const storedPitch = hasStoredState ? storedState.pitch : null;
+const storedLat = hasStoredState ? storedState.lat : null;
+const storedLng = hasStoredState ? storedState.lng : null;
+const storedZoom = hasStoredState ? storedState.zoom : null;
+const resolvedMonth = sanitizeMonth(referrerMonth) || sanitizeMonth(requestedMonth) || storedMonth || ALL_MONTH_KEY;
 const resolvedStyle =
   sanitizeQueryValue(getReferrerValue(referrerParams, "style"), ALLOWED_STYLES, safeStyle) ||
-  sanitizeQueryValue(storedState?.style, ALLOWED_STYLES, safeStyle);
+  sanitizeQueryValue(storedStyle, ALLOWED_STYLES, safeStyle);
 const resolvedRock =
   sanitizeQueryValue(getReferrerValue(referrerParams, "rock"), ALLOWED_ROCKS, safeRock) ||
-  sanitizeQueryValue(storedState?.rock, ALLOWED_ROCKS, safeRock);
+  sanitizeQueryValue(storedRock, ALLOWED_ROCKS, safeRock);
 const resolvedPitch =
   sanitizeQueryValue(getReferrerValue(referrerParams, "pitch"), ALLOWED_PITCH, safePitch) ||
-  sanitizeQueryValue(storedState?.pitch, ALLOWED_PITCH, safePitch);
+  sanitizeQueryValue(storedPitch, ALLOWED_PITCH, safePitch);
 const resolvedLat =
   getReferrerValue(referrerParams, "lat") ||
   requestedLat ||
-  normalizeNumericValue(storedState?.lat);
+  normalizeNumericValue(storedLat);
 const resolvedLng =
   getReferrerValue(referrerParams, "lng") ||
   requestedLng ||
-  normalizeNumericValue(storedState?.lng);
+  normalizeNumericValue(storedLng);
 const resolvedZoom =
   getReferrerValue(referrerParams, "zoom") ||
   requestedZoom ||
-  normalizeNumericValue(storedState?.zoom);
+  normalizeNumericValue(storedZoom);
 
 const COUNTRY_BY_ID = {
   ailefroide: "France",
