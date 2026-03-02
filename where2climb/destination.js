@@ -22,6 +22,28 @@ function sanitizeQueryValue(value, allowed, fallback) {
   return allowed.has(value) ? value : fallback;
 }
 
+function getReferrerParams() {
+  if (!document.referrer) return null;
+
+  try {
+    const referrer = new URL(document.referrer);
+    if (
+      referrer.origin !== window.location.origin ||
+      !referrer.pathname.endsWith("/where2climb/") &&
+      !referrer.pathname.endsWith("/where2climb/index.html")
+    ) {
+      return null;
+    }
+    return referrer.searchParams;
+  } catch {
+    return null;
+  }
+}
+
+function getReferrerValue(referrerParams, key) {
+  return referrerParams ? referrerParams.get(key) : null;
+}
+
 const detailRoot = document.querySelector("#detailRoot");
 const backToMap = document.querySelector("#backToMap");
 const detailHero = document.querySelector("#detailHero");
@@ -35,6 +57,17 @@ const destination = getDestinationById(destinationId);
 const safeStyle = sanitizeQueryValue(requestedStyle, ALLOWED_STYLES, "all");
 const safeRock = sanitizeQueryValue(requestedRock, ALLOWED_ROCKS, "all");
 const safePitch = sanitizeQueryValue(requestedPitch, ALLOWED_PITCH, "all");
+const referrerParams = getReferrerParams();
+const referrerMonth = referrerParams ? referrerParams.get("month") : null;
+const safeReferrerMonth =
+  MONTHS.some((m) => m.key === referrerMonth) ? referrerMonth : null;
+const resolvedMonth = safeReferrerMonth || (MONTHS.some((m) => m.key === requestedMonth) ? requestedMonth : "all");
+const resolvedStyle = sanitizeQueryValue(getReferrerValue(referrerParams, "style"), ALLOWED_STYLES, safeStyle);
+const resolvedRock = sanitizeQueryValue(getReferrerValue(referrerParams, "rock"), ALLOWED_ROCKS, safeRock);
+const resolvedPitch = sanitizeQueryValue(getReferrerValue(referrerParams, "pitch"), ALLOWED_PITCH, safePitch);
+const resolvedLat = referrerParams?.get("lat");
+const resolvedLng = referrerParams?.get("lng");
+const resolvedZoom = referrerParams?.get("zoom");
 
 const COUNTRY_BY_ID = {
   ailefroide: "France",
@@ -269,21 +302,25 @@ if (!destination) {
 
   function updateBackLink() {
     const backParams = new URLSearchParams();
-    backParams.set("month", requestedMonth || "all");
-    backParams.set("style", safeStyle);
-    backParams.set("rock", safeRock);
-    backParams.set("pitch", safePitch);
+    backParams.set("month", resolvedMonth || "all");
+    backParams.set("style", resolvedStyle);
+    backParams.set("rock", resolvedRock);
+    backParams.set("pitch", resolvedPitch);
 
-    if (requestedLat && Number.isFinite(Number(requestedLat))) {
-      backParams.set("lat", requestedLat);
+    const backLat = resolvedLat || requestedLat;
+    const backLng = resolvedLng || requestedLng;
+    const backZoom = resolvedZoom || requestedZoom;
+
+    if (backLat && Number.isFinite(Number(backLat))) {
+      backParams.set("lat", backLat);
     }
 
-    if (requestedLng && Number.isFinite(Number(requestedLng))) {
-      backParams.set("lng", requestedLng);
+    if (backLng && Number.isFinite(Number(backLng))) {
+      backParams.set("lng", backLng);
     }
 
-    if (requestedZoom && Number.isFinite(Number(requestedZoom))) {
-      backParams.set("zoom", requestedZoom);
+    if (backZoom && Number.isFinite(Number(backZoom))) {
+      backParams.set("zoom", backZoom);
     }
 
     backToMap.href = `./index.html?${backParams.toString()}`;
