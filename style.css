@@ -228,14 +228,16 @@ iframe {
 }
 
 .projects-shell {
-    padding: 6vh 6vw 8vh;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 8vh 6vw 10vh;
 }
 
 .projects-header {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    margin-bottom: 32px;
+    margin-bottom: 48px;
 }
 
 .projects-header h1 {
@@ -246,62 +248,99 @@ iframe {
 
 .projects-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 24px;
+    grid-template-columns: 1fr;
+    gap: 20px;
 }
 
 .project-card {
-    display: block;
-    background: rgba(255, 255, 255, 0.55);
-    border-radius: 16px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 14px;
     padding: 0;
     overflow: hidden;
-    box-shadow: inset 0 0 0 1px rgba(27, 25, 22, 0.08);
-    transition: transform 250ms ease, box-shadow 250ms ease;
+    box-shadow: 0 2px 8px rgba(27, 25, 22, 0.06);
+    transition: background 280ms ease, box-shadow 280ms ease, transform 280ms ease;
     text-decoration: none;
     color: inherit;
 }
 
 .project-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 16px 32px rgba(27, 25, 22, 0.1), inset 0 0 0 1px rgba(27, 25, 22, 0.12);
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 12px 28px rgba(27, 25, 22, 0.1);
+    transform: translateY(-2px);
 }
 
-.project-card--where2climb {
-    background: linear-gradient(135deg, #dbe6f2 0%, #c6d6e8 100%);
-}
-
-.project-card--vanlife {
-    background: linear-gradient(135deg, #dde6f1 0%, #c8d6e4 100%);
-}
+.project-card--where2climb { --card-accent: #3a6fa8; }
+.project-card--vanlife     { --card-accent: #b87a1a; }
 
 .project-body {
-    padding: 24px 28px 28px;
+    padding: 28px 32px;
 }
 
 .project-card h2 {
     font-family: "Franklin Gothic Medium", "Franklin Gothic", "ITC Franklin Gothic", "Arial Narrow", Arial, sans-serif;
-    font-size: 1.2rem;
-    margin: 0 0 10px;
+    font-size: 1.15rem;
+    margin: 0 0 8px;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.project-card h2::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--card-accent);
+    flex-shrink: 0;
 }
 
 .project-card p {
-    font-size: 0.82rem;
-    line-height: 1.6;
+    font-size: 0.8rem;
+    line-height: 1.65;
     color: var(--ink-muted);
-    margin: 0 0 16px;
+    margin: 0 0 14px;
+}
+
+.project-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
 .project-tag {
     display: inline-block;
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    background: rgba(74, 107, 138, 0.14);
+    background: rgba(74, 107, 138, 0.12);
     color: var(--accent-strong);
     border-radius: 999px;
     padding: 3px 10px;
-    margin-right: 6px;
+}
+
+.project-arrow {
+    padding: 0 32px;
+    font-size: 1.2rem;
+    color: rgba(27, 25, 22, 0.15);
+    transition: color 280ms ease, transform 280ms ease;
+}
+
+.project-card:hover .project-arrow {
+    color: var(--card-accent);
+    transform: translateX(4px);
+}
+
+@media (max-width: 600px) {
+    .project-card { grid-template-columns: 1fr; }
+    .project-arrow { display: none; }
 }
 
 /* ── About ── */
