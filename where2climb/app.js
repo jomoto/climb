@@ -4,6 +4,7 @@ import {
   MONTH_LABELS,
   isPrimeMonth,
   isGoodMonth,
+  isPrimaryBoulderingDestination,
   monthScore,
   styleMatches,
   rockTypeMatches,
@@ -241,6 +242,8 @@ function markerColor(style) {
 function computeStyle(destination) {
   const rc = destination.routeCounts || {};
   const total = Object.values(rc).reduce((sum, value) => sum + (Number(value) || 0), 0);
+
+  if (isPrimaryBoulderingDestination(destination)) return "boulder";
 
   if (total > 0) {
     const boulderPct = (Number(rc.boulder) || 0) / total;

@@ -3946,6 +3946,10 @@ export function getDestinationById(id) {
   return undefined;
 }
 
+const ROUTE_STYLE_KEYS = ["sport", "trad", "boulder"];
+// Keep split areas like Bishop while excluding areas with only incidental boulder problems.
+const PRIMARY_BOULDER_MIN_SHARE = 0.4;
+
 function slugify(value) {
   return String(value)
     .toLowerCase()
@@ -3956,9 +3960,25 @@ function slugify(value) {
     .replace(/^-+|-+$/g, "");
 }
 
+function routeStyleCount(destination, style) {
+  return Number(destination.routeCounts?.[style]) || 0;
+}
+
+export function isPrimaryBoulderingDestination(destination) {
+  const boulderCount = routeStyleCount(destination, "boulder");
+  if (boulderCount <= 0) return false;
+
+  const routeStyleCounts = ROUTE_STYLE_KEYS.map((style) => routeStyleCount(destination, style));
+  const routeStyleTotal = routeStyleCounts.reduce((sum, count) => sum + count, 0);
+  if (routeStyleTotal <= 0) return false;
+
+  const largestStyleCount = Math.max(...routeStyleCounts);
+  return boulderCount === largestStyleCount && boulderCount / routeStyleTotal >= PRIMARY_BOULDER_MIN_SHARE;
+}
+
 export function styleMatches(destination, style) {
   if (style === "all") return true;
-  if (style === "boulder") return (destination.routeCounts?.boulder ?? 0) > 0;
+  if (style === "boulder") return isPrimaryBoulderingDestination(destination);
   if (style === "mixed") return destination.styles.includes("sport") || destination.styles.includes("trad");
   return destination.styles.includes(style);
 }
