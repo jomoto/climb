@@ -3959,6 +3959,7 @@ function slugify(value) {
 export function styleMatches(destination, style) {
   if (style === "all") return true;
   if (style === "boulder") return (destination.routeCounts?.boulder ?? 0) > 0;
+  if (style === "mixed") return destination.styles.includes("sport") || destination.styles.includes("trad");
   return destination.styles.includes(style);
 }
 
