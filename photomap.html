@@ -262,6 +262,15 @@
             return div.innerHTML;
         }
 
+        function encodePath(path) {
+            return String(path || '')
+                .split('/')
+                .map(function (segment) {
+                    return encodeURIComponent(segment);
+                })
+                .join('/');
+        }
+
         // ── Tour state ─────────────────────────────────────
         var allMarkers = [];     // { marker, lat, lon, row }
         var tourNeighbors = [];  // sorted by distance from current
@@ -328,12 +337,12 @@
             var lon = parseFloat(row.lon);
             if (isNaN(lat) || isNaN(lon)) return null;
 
-            var filename = row.photo_filename;
+            var filename = String(row.photo_filename || '');
             var thumbFile = USE_THUMBNAILS
                 ? filename.replace(/(\.\w+)$/, '-thumb$1')
                 : filename;
-            var imgUrl = R2_BASE_URL + '/' + thumbFile;
-            var fullUrl = R2_BASE_URL + '/' + filename;
+            var imgUrl = escapeHtml(R2_BASE_URL + '/' + encodePath(thumbFile));
+            var fullUrl = escapeHtml(R2_BASE_URL + '/' + encodePath(filename));
             var title = escapeHtml(row.title);
 
             var hintHtml = '<span class="popup-hint">explore nearby</span>';

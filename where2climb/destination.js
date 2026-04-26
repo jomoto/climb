@@ -342,22 +342,29 @@ if (!destination) {
 }
 
 function routeMixText(routeCounts = {}) {
-  const trad = routeCounts.trad || 0;
-  const sport = routeCounts.sport || 0;
-  const total = trad + sport;
-  if (trad && sport) {
-    const tradPct = Math.round((trad / total) * 100);
-    const sportPct = 100 - tradPct;
-    if (tradPct === 0) return "~100% sport";
-    if (sportPct === 0) return "~100% trad";
-    return `${sportPct}% sport / ${tradPct}% trad`;
+  const styles = [
+    { label: "sport", count: Number(routeCounts.sport) || 0 },
+    { label: "trad", count: Number(routeCounts.trad) || 0 },
+    { label: "boulder", count: Number(routeCounts.boulder) || 0 },
+  ].filter((style) => style.count > 0);
+
+  if (styles.length) {
+    const total = styles.reduce((sum, style) => sum + style.count, 0);
+    let allocatedPct = 0;
+
+    return styles
+      .sort((a, b) => b.count - a.count)
+      .map((style, index) => {
+        const pct =
+          index === styles.length - 1
+            ? Math.max(0, 100 - allocatedPct)
+            : Math.round((style.count / total) * 100);
+        allocatedPct += pct;
+        return `${pct}% ${style.label}`;
+      })
+      .join(" / ");
   }
-  if (trad) {
-    return "100% trad";
-  }
-  if (sport) {
-    return "100% sport";
-  }
+
   return "Route mix unavailable";
 }
 
