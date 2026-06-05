@@ -3,7 +3,7 @@
 > Personal website of Shino Jomoto — climber, adventurer, burrito enthusiast.
 
 ## About
-- [About](https://shinojomoto.com/about.html): Personal facts, humor, and musings. Shino's favorite food is the super burrito. Fervent salad dodger. Biggest regret is not creating a Yelp just for burritos. New year's resolution is always the same: summit a lot of stuff. No longer on the socials/LinkedIn, so email is the best way to get in touch.
+- [About](https://shinojomoto.com/about.html): Personal facts, humor, and musings. Shino's favorite food is the super burrito. Fervent salad dodger. Biggest regret is not creating a Yelp just for burritos. New year's resolution is always the same: summit a lot of stuff. no longer on the socials/LinkedIn, so email is the best way to get in touch.
 
 ## Climbing
 - [Climbing](https://shinojomoto.com/climbing.html): Interactive maps and photo map of climbing adventures around the world — Yosemite, Patagonia, Japan, Croatia, Switzerland, Jordan, Oman, Thailand, and many more locations. Includes trip reports for routes like The Nose, The Salathe, and Astroman on El Capitan.
