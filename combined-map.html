@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <title>Climbing routes and photos</title>
+    <style>
+        :root {
+            --blue: #568fd0;
+            --blue-soft: rgba(86, 143, 208, 0.32);
+            --green: #56a878;
+            --green-soft: rgba(86, 168, 120, 0.32);
+            --panel: rgba(20, 24, 37, 0.94);
+            --ink: #e8eaf0;
+            --muted: #9aa3b6;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html,
+        body,
+        #combined-map {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            font-family: "IBM Plex Mono", monospace;
+            background: #18202a;
+        }
+
+        #combined-map {
+            position: absolute;
+            inset: 0;
+        }
+
+        .leaflet-container {
+            font-family: "IBM Plex Mono", monospace;
+            background: #dce9ec;
+        }
+
+        .leaflet-bar a {
+            color: #202737;
+        }
+
+        .map-dot-icon {
+            background: transparent;
+            border: 0;
+        }
+
+        .map-dot {
+            display: block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.94);
+            border-radius: 50%;
+            box-shadow: 0 2px 7px rgba(20, 24, 37, 0.4);
+            transition: transform 150ms ease;
+        }
+
+        .map-dot-icon:hover .map-dot,
+        .map-dot-icon:focus .map-dot {
+            transform: scale(1.3);
+        }
+
+        .map-dot--photo {
+            background: var(--blue);
+        }
+
+        .map-dot--tick {
+            background: var(--green);
+        }
+
+        .combined-cluster {
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 500;
+            box-shadow: 0 2px 10px rgba(20, 24, 37, 0.28);
+        }
+
+        .combined-cluster span {
+            display: grid;
+            width: 32px;
+            height: 32px;
+            place-items: center;
+            border: 5px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+        }
+
+        .combined-cluster--photo {
+            background: var(--blue-soft);
+        }
+
+        .combined-cluster--photo span {
+            background: var(--blue);
+        }
+
+        .combined-cluster--tick {
+            background: var(--green-soft);
+        }
+
+        .combined-cluster--tick span {
+            background: var(--green);
+        }
+
+        .map-key {
+            min-width: 186px;
+            padding: 9px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            background: var(--panel);
+            box-shadow: 0 8px 24px rgba(20, 24, 37, 0.3);
+            color: var(--ink);
+        }
+
+        .map-key-label {
+            display: block;
+            padding: 2px 5px 8px;
+            color: var(--muted);
+            font-size: 0.56rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .map-key button {
+            width: 100%;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 9px;
+            padding: 9px 8px;
+            border: 0;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--ink);
+            font: inherit;
+            font-size: 0.7rem;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .map-key button:hover,
+        .map-key button:focus-visible {
+            background: rgba(255, 255, 255, 0.08);
+            outline: none;
+        }
+
+        .map-key button[aria-pressed="false"] {
+            color: #70798c;
+        }
+
+        .map-key button[aria-pressed="false"] .map-key-swatch {
+            background: #70798c;
+        }
+
+        .map-key-swatch {
+            width: 9px;
+            height: 9px;
+            border: 1px solid rgba(255, 255, 255, 0.85);
+            border-radius: 50%;
+        }
+
+        .map-key-swatch--photo {
+            background: var(--blue);
+        }
+
+        .map-key-swatch--tick {
+            background: var(--green);
+        }
+
+        .map-key-count {
+            color: var(--muted);
+            font-size: 0.6rem;
+        }
+
+        .leaflet-popup-content-wrapper {
+            overflow: hidden;
+            padding: 0;
+            border-radius: 12px;
+            box-shadow: 0 12px 30px rgba(20, 24, 37, 0.22);
+        }
+
+        .leaflet-popup-content {
+            width: 280px !important;
+            margin: 0;
+        }
+
+        .map-popup {
+            color: #202737;
+        }
+
+        .photo-popup img {
+            display: block;
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            background: #edf0f2;
+        }
+
+        .popup-body {
+            padding: 15px 16px 17px;
+        }
+
+        .photo-popup {
+            --marker-color: var(--blue);
+        }
+
+        .tick-popup {
+            --marker-color: var(--green);
+        }
+
+        .popup-title {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin: 0;
+            font-family: "Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif;
+            font-size: 1.08rem;
+            line-height: 1.25;
+        }
+
+        .popup-title::before {
+            content: "";
+            width: 9px;
+            height: 9px;
+            flex: 0 0 9px;
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            background: var(--marker-color);
+            box-shadow: 0 1px 3px rgba(20, 24, 37, 0.22);
+        }
+
+        .popup-meta,
+        .popup-location,
+        .popup-notes {
+            margin: 8px 0 0;
+            color: #687387;
+            font-size: 0.67rem;
+            line-height: 1.5;
+        }
+
+        .popup-notes {
+            color: #444e5f;
+        }
+
+        .popup-link {
+            display: inline-block;
+            margin-top: 13px;
+            padding-bottom: 2px;
+            border-bottom: 1px solid var(--green);
+            color: #276946;
+            font-size: 0.68rem;
+            text-decoration: none;
+        }
+
+        .photo-nav {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border-top: 1px solid #e3e7eb;
+        }
+
+        .photo-nav button {
+            min-height: 42px;
+            padding: 9px 12px;
+            border: 0;
+            background: #fff;
+            color: #3b6798;
+            font: 500 0.66rem/1.2 "IBM Plex Mono", monospace;
+            cursor: pointer;
+        }
+
+        .photo-nav button + button {
+            border-left: 1px solid #e3e7eb;
+        }
+
+        .photo-nav button:hover,
+        .photo-nav button:focus-visible {
+            background: #edf4fb;
+            outline: none;
+        }
+
+        .photo-nav button:disabled {
+            background: #fff;
+            color: #aeb6c2;
+            cursor: default;
+        }
+
+        @media (max-width: 600px) {
+            .map-key {
+                min-width: 158px;
+                padding: 7px;
+            }
+
+            .map-key button {
+                padding: 8px 6px;
+                font-size: 0.64rem;
+            }
+
+            .leaflet-popup-content {
+                width: 240px !important;
+            }
+
+            .photo-popup img {
+                height: 150px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .map-dot {
+                transition: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="combined-map" aria-label="Interactive map of climbing routes and photographs"></div>
+    <script>
+    (function () {
+        'use strict';
+
+        var PHOTO_BASE_URL = 'https://pub-d42396f675434597b9696afabeeaf051.r2.dev';
+
+        var map = L.map('combined-map', {
+            center: [25, -25],
+            zoom: 2,
+            minZoom: 2,
+            zoomControl: true,
+            scrollWheelZoom: true,
+            worldCopyJump: true
+        });
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        function clusterIcon(kind) {
+            return function (cluster) {
+                return L.divIcon({
+                    className: 'combined-cluster combined-cluster--' + kind,
+                    html: '<span>' + cluster.getChildCount() + '</span>',
+                    iconSize: [40, 40]
+                });
+            };
+        }
+
+        var photoLayer = L.markerClusterGroup({
+            iconCreateFunction: clusterIcon('photo'),
+            maxClusterRadius: 34,
+            showCoverageOnHover: false,
+            spiderfyOnMaxZoom: true
+        }).addTo(map);
+
+        var tickLayer = L.markerClusterGroup({
+            iconCreateFunction: clusterIcon('tick'),
+            maxClusterRadius: 34,
+            showCoverageOnHover: false,
+            spiderfyOnMaxZoom: true
+        }).addTo(map);
+
+        var mapBounds = L.latLngBounds();
+        var counts = { photo: 0, tick: 0 };
+        var photoEntries = [];
+        var photoTour = [];
+        var photoTourIndex = -1;
+        var photoNavigationInProgress = false;
+        var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        function parseCSVLine(line) {
+            var result = [];
+            var current = '';
+            var inQuotes = false;
+
+            for (var i = 0; i < line.length; i++) {
+                var character = line[i];
+                if (inQuotes) {
+                    if (character === '"') {
+                        if (line[i + 1] === '"') {
+                            current += '"';
+                            i++;
+                        } else {
+                            inQuotes = false;
+                        }
+                    } else {
+                        current += character;
+                    }
+                } else if (character === '"') {
+                    inQuotes = true;
+                } else if (character === ',') {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += character;
+                }
+            }
+
+            result.push(current);
+            return result;
+        }
+
+        function parseCSV(text) {
+            var lines = text.replace(/\r/g, '').trim().split('\n');
+            var headers = parseCSVLine(lines.shift());
+
+            return lines.filter(Boolean).map(function (line) {
+                var values = parseCSVLine(line);
+                var row = {};
+                headers.forEach(function (header, index) {
+                    row[header.trim()] = (values[index] || '').trim();
+                });
+                return row;
+            });
+        }
+
+        function escapeHtml(value) {
+            var element = document.createElement('div');
+            element.textContent = String(value || '');
+            return element.innerHTML;
+        }
+
+        function encodePath(path) {
+            return String(path || '').split('/').map(encodeURIComponent).join('/');
+        }
+
+        function markerIcon(kind) {
+            return L.divIcon({
+                className: 'map-dot-icon',
+                html: '<span class="map-dot map-dot--' + kind + '"></span>',
+                iconSize: [14, 14],
+                iconAnchor: [7, 7],
+                popupAnchor: [0, -8]
+            });
+        }
+
+        function distanceBetweenPhotos(first, second) {
+            var toRadians = Math.PI / 180;
+            var latitudeDelta = (second.latitude - first.latitude) * toRadians;
+            var longitudeDelta = (second.longitude - first.longitude) * toRadians;
+            var firstLatitude = first.latitude * toRadians;
+            var secondLatitude = second.latitude * toRadians;
+            var haversine = Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2) +
+                Math.cos(firstLatitude) * Math.cos(secondLatitude) *
+                Math.sin(longitudeDelta / 2) * Math.sin(longitudeDelta / 2);
+            return 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+        }
+
+        function closestUnvisitedPhoto(current) {
+            var visited = new Set(photoTour.map(function (entry) {
+                return entry.id;
+            }));
+
+            return photoEntries.filter(function (entry) {
+                return entry.id !== current.id && !visited.has(entry.id);
+            }).sort(function (first, second) {
+                return distanceBetweenPhotos(current, first) - distanceBetweenPhotos(current, second);
+            })[0] || null;
+        }
+
+        function openPhotoEntry(entry) {
+            photoNavigationInProgress = true;
+            map.closePopup();
+
+            function revealMarker() {
+                photoLayer.zoomToShowLayer(entry.marker, function () {
+                    entry.marker.openPopup();
+                });
+            }
+
+            if (reduceMotion) {
+                map.setView([entry.latitude, entry.longitude], Math.max(map.getZoom(), 8));
+                window.setTimeout(revealMarker, 0);
+            } else {
+                map.flyTo([entry.latitude, entry.longitude], Math.max(map.getZoom(), 8), {
+                    duration: 0.65
+                });
+                window.setTimeout(revealMarker, 700);
+            }
+        }
+
+        function showNextPhoto() {
+            if (photoTourIndex < 0) return;
+
+            if (photoTourIndex < photoTour.length - 1) {
+                photoTourIndex++;
+                openPhotoEntry(photoTour[photoTourIndex]);
+                return;
+            }
+
+            var next = closestUnvisitedPhoto(photoTour[photoTourIndex]);
+            if (!next) return;
+            photoTour.push(next);
+            photoTourIndex++;
+            openPhotoEntry(next);
+        }
+
+        function showPreviousPhoto() {
+            if (photoTourIndex <= 0) return;
+            photoTourIndex--;
+            openPhotoEntry(photoTour[photoTourIndex]);
+        }
+
+        function connectPhotoNavigation(marker) {
+            var popupElement = marker.getPopup().getElement();
+            if (!popupElement) return;
+
+            var previousButton = popupElement.querySelector('.photo-prev');
+            var nextButton = popupElement.querySelector('.photo-next');
+            previousButton.disabled = photoTourIndex <= 0;
+            nextButton.disabled = photoEntries.length < 2;
+
+            previousButton.onclick = function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                showPreviousPhoto();
+            };
+
+            nextButton.onclick = function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                showNextPhoto();
+            };
+        }
+
+        function addPhoto(row) {
+            var latitude = parseFloat(row.lat);
+            var longitude = parseFloat(row.lon);
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+            var filename = String(row.photo_filename || '');
+            var thumbnail = filename.replace(/(\.\w+)$/, '-thumb$1');
+            var title = escapeHtml(row.title || 'Untitled photograph');
+            var imageUrl = PHOTO_BASE_URL + '/' + encodePath(thumbnail);
+            var fullUrl = PHOTO_BASE_URL + '/' + encodePath(filename);
+            var popup = '<article class="map-popup photo-popup">' +
+                '<a href="' + fullUrl + '" target="_blank" rel="noreferrer">' +
+                '<img src="' + imageUrl + '" alt="' + title + '">' +
+                '</a>' +
+                '<div class="popup-body">' +
+                '<h3 class="popup-title">' + title + '</h3>' +
+                '</div>' +
+                '<div class="photo-nav" role="group" aria-label="Nearby photographs">' +
+                '<button class="photo-prev" type="button" aria-label="Show previous photograph">← Previous</button>' +
+                '<button class="photo-next" type="button" aria-label="Show closest unvisited photograph">Next →</button>' +
+                '</div></article>';
+
+            var marker = L.marker([latitude, longitude], { icon: markerIcon('photo') });
+            var entry = {
+                id: photoEntries.length,
+                marker: marker,
+                latitude: latitude,
+                longitude: longitude
+            };
+            marker.bindPopup(popup, { maxWidth: 280 });
+            marker.bindTooltip('Photo · ' + (row.title || 'Untitled'));
+            marker.on('popupopen', function () {
+                if (photoNavigationInProgress) {
+                    photoNavigationInProgress = false;
+                } else {
+                    photoTour = [entry];
+                    photoTourIndex = 0;
+                }
+                connectPhotoNavigation(marker);
+            });
+            photoEntries.push(entry);
+            photoLayer.addLayer(marker);
+            mapBounds.extend([latitude, longitude]);
+            counts.photo++;
+        }
+
+        function shortenedLocation(location) {
+            return String(location || '').split('>').map(function (part) {
+                return part.trim();
+            }).filter(Boolean).slice(-2).join(' · ');
+        }
+
+        function addTick(row) {
+            var coordinates = String(row['Lat and long'] || '').split(',');
+            var latitude = parseFloat(coordinates[0]);
+            var longitude = parseFloat(coordinates[1]);
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+            var title = escapeHtml(row.Route || 'Untitled route');
+            var rating = escapeHtml(row.Rating);
+            var date = escapeHtml(row.Date);
+            var pitches = escapeHtml(row.Pitches);
+            var location = escapeHtml(shortenedLocation(row.Location));
+            var notes = escapeHtml(row.Notes);
+            var meta = [rating, pitches ? pitches + (pitches === '1' ? ' pitch' : ' pitches') : '', date].filter(Boolean).join(' · ');
+            var url = /^https?:\/\//i.test(row.URL || '') ? escapeHtml(row.URL) : '';
+            var popup = '<article class="map-popup tick-popup"><div class="popup-body">' +
+                '<h3 class="popup-title">' + title + '</h3>' +
+                (meta ? '<p class="popup-meta">' + meta + '</p>' : '') +
+                (location ? '<p class="popup-location">' + location + '</p>' : '') +
+                (notes ? '<p class="popup-notes">' + notes + '</p>' : '') +
+                (url ? '<a class="popup-link" href="' + url + '" target="_blank" rel="noreferrer">View route ↗</a>' : '') +
+                '</div></article>';
+
+            var marker = L.marker([latitude, longitude], { icon: markerIcon('tick') });
+            marker.bindPopup(popup, { maxWidth: 280 });
+            marker.bindTooltip('Route · ' + (row.Route || 'Untitled'));
+            tickLayer.addLayer(marker);
+            mapBounds.extend([latitude, longitude]);
+            counts.tick++;
+        }
+
+        function addMapKey() {
+            var control = L.control({ position: 'topright' });
+            control.onAdd = function () {
+                var container = L.DomUtil.create('div', 'map-key');
+                container.setAttribute('role', 'group');
+                container.setAttribute('aria-label', 'Map layers');
+                container.innerHTML =
+                    '<span class="map-key-label">Map layers</span>' +
+                    '<button type="button" data-layer="photo" aria-pressed="true">' +
+                    '<span class="map-key-swatch map-key-swatch--photo"></span>' +
+                    '<span>Photos</span><span class="map-key-count">' + counts.photo + '</span></button>' +
+                    '<button type="button" data-layer="tick" aria-pressed="true">' +
+                    '<span class="map-key-swatch map-key-swatch--tick"></span>' +
+                    '<span>Route</span><span class="map-key-count">' + counts.tick + '</span></button>';
+
+                L.DomEvent.disableClickPropagation(container);
+                L.DomEvent.disableScrollPropagation(container);
+
+                container.querySelectorAll('button').forEach(function (button) {
+                    button.addEventListener('click', function () {
+                        var kind = button.dataset.layer;
+                        var layer = kind === 'photo' ? photoLayer : tickLayer;
+                        var enabled = button.getAttribute('aria-pressed') === 'true';
+                        if (enabled) {
+                            map.removeLayer(layer);
+                        } else {
+                            map.addLayer(layer);
+                        }
+                        button.setAttribute('aria-pressed', String(!enabled));
+                    });
+                });
+
+                return container;
+            };
+            control.addTo(map);
+        }
+
+        Promise.all([
+            fetch('photos.csv').then(function (response) {
+                if (!response.ok) throw new Error('Unable to load photographs');
+                return response.text();
+            }),
+            fetch('ticks.csv').then(function (response) {
+                if (!response.ok) throw new Error('Unable to load route ticks');
+                return response.text();
+            })
+        ]).then(function (files) {
+            parseCSV(files[0]).forEach(addPhoto);
+            parseCSV(files[1]).forEach(addTick);
+            addMapKey();
+            if (mapBounds.isValid()) {
+                map.fitBounds(mapBounds.pad(0.06), { maxZoom: 3 });
+            }
+        }).catch(function (error) {
+            var notice = L.control({ position: 'topright' });
+            notice.onAdd = function () {
+                var container = L.DomUtil.create('div', 'map-key');
+                container.textContent = error.message;
+                return container;
+            };
+            notice.addTo(map);
+        });
+    })();
+    </script>
+</body>
+</html>
