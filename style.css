@@ -542,10 +542,6 @@ body.about {
         padding: 18px 24px 22px;
     }
 
-    .home-edition {
-        display: none;
-    }
-
     .home-hero {
         grid-template-columns: 1fr;
         gap: 26px;
