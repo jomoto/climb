@@ -67,6 +67,9 @@ const styleSelect = document.querySelector("#styleSelect");
 const rockSelect = document.querySelector("#rockSelect");
 const pitchToggle = document.querySelector("#pitchToggle");
 const destinationCount = document.querySelector("#destinationCount");
+const mobileDestinationCount = document.querySelector("#mobileDestinationCount");
+const topbar = document.querySelector(".topbar");
+const filterToggle = document.querySelector("#filterToggle");
 
 const map = L.map("map", {
   minZoom: 2,
@@ -119,6 +122,22 @@ function populateMonthSelect() {
 }
 
 function wireEvents() {
+  filterToggle.addEventListener("click", () => {
+    const isOpen = topbar.classList.toggle("filters-open");
+    filterToggle.setAttribute("aria-expanded", String(isOpen));
+    filterToggle.querySelector("span").textContent = isOpen ? "−" : "+";
+    window.setTimeout(() => map.invalidateSize(), 0);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !topbar.classList.contains("filters-open")) return;
+    topbar.classList.remove("filters-open");
+    filterToggle.setAttribute("aria-expanded", "false");
+    filterToggle.querySelector("span").textContent = "+";
+    filterToggle.focus();
+    window.setTimeout(() => map.invalidateSize(), 0);
+  });
+
   monthSelect.addEventListener("change", (event) => {
     state.month = event.target.value;
     render();
@@ -233,6 +252,7 @@ function renderMap(destinations) {
 
 function renderCount(count) {
   destinationCount.textContent = `${count} destinations`;
+  mobileDestinationCount.textContent = `${count} spots`;
 }
 
 function markerColor(style) {

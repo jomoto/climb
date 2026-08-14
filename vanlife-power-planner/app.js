@@ -2662,6 +2662,7 @@ function calculate() {
   };
 
   byId("dailyUseBig").textContent = `${formatEnergy(totalDailyWh)}/day`;
+  byId("mobileDailyUse").textContent = `${formatEnergy(totalDailyWh)}/day`;
   byId("dailyUseAh").textContent = `${dailyAh.toFixed(1)} Ah/day @ ${state.voltage}V`;
   byId("usagePersona").textContent = energyPersona(totalDailyWh);
   byId("dailyRecharge").textContent = formatEnergy(rechargeWh);
@@ -2916,6 +2917,22 @@ function updateSystemWarnings(totalDailyWh, acPeakWatts, dailyAh, coldDerating, 
 }
 
 function init() {
+  const mobileSteps = [...document.querySelectorAll("[data-mobile-step]")];
+  mobileSteps.forEach((section, index) => {
+    const button = section.querySelector(".mobile-step-toggle");
+    if (window.matchMedia("(max-width: 760px)").matches && index > 0) {
+      section.classList.add("mobile-step-collapsed");
+      button.setAttribute("aria-expanded", "false");
+      button.querySelector(".mobile-step-icon").textContent = "+";
+    }
+
+    button.addEventListener("click", () => {
+      const isCollapsed = section.classList.toggle("mobile-step-collapsed");
+      button.setAttribute("aria-expanded", String(!isCollapsed));
+      button.querySelector(".mobile-step-icon").textContent = isCollapsed ? "+" : "−";
+    });
+  });
+
   applyTheme(resolveInitialTheme());
 
   initStateFromLibrary();

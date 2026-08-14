@@ -12,8 +12,8 @@
     />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="styles.css" />
-    <script defer src="app.js"></script>
+    <link rel="stylesheet" href="styles.css?v=20260813b" />
+    <script defer src="app.js?v=20260813b"></script>
   </head>
   <body>
     <button id="themeToggle" class="theme-toggle" type="button" aria-pressed="false">
@@ -26,6 +26,11 @@
 
     <main class="layout">
       <header class="hero">
+        <nav class="tool-site-nav" aria-label="Site">
+          <a href="../index.html">Shino Jomoto</a>
+          <span aria-hidden="true">/</span>
+          <a href="../projects.html">Projects</a>
+        </nav>
         <p class="kicker">van build tool</p>
         <h1>Vanlife Power Planner</h1>
         <p class="subtitle">
@@ -36,7 +41,10 @@
 
       <div class="app-grid">
         <section class="panel controls-panel">
-          <section class="panel-section">
+          <section class="panel-section" data-mobile-step>
+            <button class="mobile-step-toggle" type="button" aria-expanded="true">
+              <span class="mobile-step-number">01</span><span>Power Profile</span><span class="mobile-step-icon" aria-hidden="true">−</span>
+            </button>
             <div class="section-title-row">
               <h2>Power Profile</h2>
               <div class="presets" id="presets">
@@ -49,7 +57,10 @@
             <div class="loads-grid" id="loadsGrid"></div>
           </section>
 
-          <section class="panel-section">
+          <section class="panel-section" data-mobile-step>
+            <button class="mobile-step-toggle" type="button" aria-expanded="true">
+              <span class="mobile-step-number">02</span><span>Solar + Driving Input</span><span class="mobile-step-icon" aria-hidden="true">−</span>
+            </button>
             <h2>Solar + Driving Input</h2>
             <p class="section-copy">
               Charging is modeled from panel wattage, sun exposure, and alternator power while driving.
@@ -150,7 +161,10 @@
             </div>
           </section>
 
-          <section class="panel-section">
+          <section class="panel-section" data-mobile-step>
+            <button class="mobile-step-toggle" type="button" aria-expanded="true">
+              <span class="mobile-step-number">03</span><span>Battery Setup</span><span class="mobile-step-icon" aria-hidden="true">−</span>
+            </button>
             <h2>Battery Setup</h2>
             <p class="section-copy">Set reserve autonomy and test your planned battery bank.</p>
 
@@ -192,7 +206,10 @@
             <button id="syncInstalled" class="ghost-btn" type="button">Set planned bank to recommendation</button>
           </section>
 
-          <section class="panel-section">
+          <section class="panel-section" data-mobile-step>
+            <button class="mobile-step-toggle" type="button" aria-expanded="true">
+              <span class="mobile-step-number">04</span><span>Assumptions File</span><span class="mobile-step-icon" aria-hidden="true">−</span>
+            </button>
             <h2>Assumptions File</h2>
             <p class="section-copy">
               Download a starter settings file (includes all tunable parameters such as
@@ -209,7 +226,7 @@
           </section>
         </section>
 
-        <aside class="panel results-panel">
+        <aside class="panel results-panel" id="results">
           <h2>Estimated Daily Consumption</h2>
 
           <section class="consumption-hero">
@@ -350,6 +367,12 @@
         </aside>
       </div>
     </main>
+
+    <a class="mobile-live-summary" href="#results" aria-label="View live results">
+      <span>Daily use</span>
+      <strong id="mobileDailyUse">0 Wh/day</strong>
+      <span>Results ↑</span>
+    </a>
 
     <div id="mapModal" class="map-modal hidden" aria-hidden="true">
       <div class="map-dialog" role="dialog" aria-modal="true" aria-labelledby="mapDialogTitle">

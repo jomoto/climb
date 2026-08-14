@@ -382,44 +382,45 @@
         var photoNavigationInProgress = false;
         var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-        function parseCSVLine(line) {
-            var result = [];
-            var current = '';
+        function parseCSV(text) {
+            var rows = [];
+            var row = [];
+            var field = '';
             var inQuotes = false;
+            var source = text.replace(/\r\n?/g, '\n');
 
-            for (var i = 0; i < line.length; i++) {
-                var character = line[i];
+            for (var i = 0; i < source.length; i++) {
+                var character = source[i];
+
                 if (inQuotes) {
-                    if (character === '"') {
-                        if (line[i + 1] === '"') {
-                            current += '"';
-                            i++;
-                        } else {
-                            inQuotes = false;
-                        }
+                    if (character === '"' && source[i + 1] === '"') {
+                        field += '"';
+                        i++;
+                    } else if (character === '"') {
+                        inQuotes = false;
                     } else {
-                        current += character;
+                        field += character;
                     }
                 } else if (character === '"') {
                     inQuotes = true;
                 } else if (character === ',') {
-                    result.push(current);
-                    current = '';
+                    row.push(field);
+                    field = '';
+                } else if (character === '\n') {
+                    row.push(field);
+                    if (row.some(function (value) { return value.trim() !== ''; })) rows.push(row);
+                    row = [];
+                    field = '';
                 } else {
-                    current += character;
+                    field += character;
                 }
             }
 
-            result.push(current);
-            return result;
-        }
+            row.push(field);
+            if (row.some(function (value) { return value.trim() !== ''; })) rows.push(row);
 
-        function parseCSV(text) {
-            var lines = text.replace(/\r/g, '').trim().split('\n');
-            var headers = parseCSVLine(lines.shift());
-
-            return lines.filter(Boolean).map(function (line) {
-                var values = parseCSVLine(line);
+            var headers = rows.shift() || [];
+            return rows.map(function (values) {
                 var row = {};
                 headers.forEach(function (header, index) {
                     row[header.trim()] = (values[index] || '').trim();

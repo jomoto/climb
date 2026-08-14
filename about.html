@@ -6,7 +6,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=a1749c9">
+    <link rel="stylesheet" href="style.css?v=20260813b">
     <title>About — Shino Jomoto</title>
     <meta name="description" content="About Shino Jomoto — climber, adventurer, burrito enthusiast, and fervent salad dodger.">
     <meta name="author" content="Shino Jomoto">
@@ -32,13 +32,23 @@
     </script>
 </head>
 <body class="about">
-    <a class="about-home" href="index.html">home</a>
+    <header class="site-header site-header--overlay">
+        <a class="site-brand" href="index.html"><span aria-hidden="true"></span>Shino Jomoto</a>
+        <nav class="site-nav" aria-label="Primary">
+            <a href="about.html" aria-current="page">About</a>
+            <a href="climbing.html">Climbing</a>
+            <a href="projects.html">Projects</a>
+            <a href="mailto:shino.jomoto@gmail.com">Contact</a>
+        </nav>
+    </header>
     <div class="about-text" id="scrubber-text">
         <p>unequivocally, my favorite food is the super burrito</p>
     </div>
     <div class="scrubber-track" id="scrubber-track">
         <div class="scrubber-line"></div>
-        <div class="scrubber-handle" id="scrubber-handle"></div>
+        <div class="scrubber-handle" id="scrubber-handle" role="slider" tabindex="0"
+             aria-label="About Shino" aria-valuemin="1" aria-valuemax="6"
+             aria-valuenow="1" aria-valuetext="unequivocally, my favorite food is the super burrito"></div>
     </div>
     <noscript>
     <style>.about-text{display:none}</style>
@@ -88,6 +98,8 @@
 
             var idx = Math.round(progress * (items.length - 1));
             var text = items[idx];
+            handle.setAttribute('aria-valuenow', String(idx + 1));
+            handle.setAttribute('aria-valuetext', text);
 
             if (textEl.dataset.current !== String(idx)) {
                 textEl.dataset.current = String(idx);
@@ -134,6 +146,20 @@
 
         handle.addEventListener('mousedown', onPointerDown);
         handle.addEventListener('touchstart', onPointerDown, { passive: false });
+        handle.addEventListener('keydown', function (event) {
+            var currentIndex = Math.round(progress * (items.length - 1));
+            var nextIndex = currentIndex;
+
+            if (event.key === 'ArrowRight' || event.key === 'ArrowUp') nextIndex++;
+            else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') nextIndex--;
+            else if (event.key === 'Home') nextIndex = 0;
+            else if (event.key === 'End') nextIndex = items.length - 1;
+            else return;
+
+            event.preventDefault();
+            nextIndex = Math.max(0, Math.min(items.length - 1, nextIndex));
+            updateFromProgress(nextIndex / (items.length - 1));
+        });
         document.addEventListener('mousemove', onPointerMove);
         document.addEventListener('touchmove', onPointerMove, { passive: false });
         document.addEventListener('mouseup', onPointerUp);
