@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+root_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+python_bin="$root_dir/scripts/venv/bin/python"
+
+if [ ! -x "$python_bin" ]; then
+  echo "Photo tools are not set up yet. Create scripts/venv and install scripts/requirements.txt first." >&2
+  exit 1
+fi
+
+exec "$python_bin" "$root_dir/scripts/audit_photo_privacy.py" "$@"
