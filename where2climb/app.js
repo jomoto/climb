@@ -80,12 +80,29 @@ const map = L.map("map", {
   toFiniteNumber(mapZoomQuery, 2)
 );
 
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-  maxZoom: 19,
-  subdomains: "abcd",
-  attribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-}).addTo(map);
+L.tileLayer(
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+  {
+    maxNativeZoom: 16,
+    maxZoom: 19,
+    attribution:
+      '&copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, and the GIS user community',
+  }
+).addTo(map);
+
+map.createPane("basemap-labels");
+map.getPane("basemap-labels").style.zIndex = 250;
+map.getPane("basemap-labels").style.pointerEvents = "none";
+
+L.tileLayer(
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+  {
+    pane: "basemap-labels",
+    maxNativeZoom: 16,
+    maxZoom: 19,
+    attribution: "",
+  }
+).addTo(map);
 
 const markerLayer = L.layerGroup().addTo(map);
 

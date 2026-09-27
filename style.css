@@ -634,7 +634,12 @@ body.about {
     }
 
     .climbing-reports ul {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .climbing-reports a {
+        line-height: 1.45;
     }
 
     .site-header {
