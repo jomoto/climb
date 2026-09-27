@@ -41,6 +41,10 @@ def parse_coordinates(value):
     except ValueError as error:
         raise argparse.ArgumentTypeError("Coordinates must be latitude,longitude") from error
 
+    return validate_coordinates(latitude, longitude)
+
+
+def validate_coordinates(latitude, longitude):
     if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
         raise argparse.ArgumentTypeError("Coordinates are outside valid latitude/longitude ranges")
     return latitude, longitude
@@ -60,6 +64,30 @@ def read_existing_filenames(csv_path):
         return {row.get("photo_filename", "") for row in csv.DictReader(file)}
 
 
+def read_locations(locations_path):
+    """Read optional filename,title,lat,lon overrides for photos without GPS."""
+    with locations_path.open(newline="", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        expected = {"filename", "lat", "lon"}
+        if not reader.fieldnames or not expected.issubset(reader.fieldnames):
+            raise ValueError("Locations file needs filename,lat,lon columns (title is optional)")
+
+        locations = {}
+        for row in reader:
+            filename = (row.get("filename") or "").strip()
+            if not filename:
+                raise ValueError("Every locations row needs a filename")
+            try:
+                coordinates = validate_coordinates(float(row["lat"]), float(row["lon"]))
+            except (TypeError, ValueError, argparse.ArgumentTypeError) as error:
+                raise ValueError(f"Invalid coordinates for {filename}") from error
+            key = filename.casefold()
+            if key in locations:
+                raise ValueError(f"Locations file lists {filename} more than once")
+            locations[key] = {"coordinates": coordinates, "title": (row.get("title") or "").strip()}
+    return locations
+
+
 def object_exists(client, bucket, key):
     try:
         client.head_object(Bucket=bucket, Key=key)
@@ -71,7 +99,16 @@ def object_exists(client, bucket, key):
         raise
 
 
-def build_entries(input_dir, existing_filenames, coordinates, explicit_title, max_width, quality):
+def build_entries(
+    input_dir,
+    existing_filenames,
+    coordinates,
+    explicit_title,
+    manual_locations,
+    only_listed,
+    max_width,
+    quality,
+):
     files = sorted(
         filepath
         for filepath in input_dir.iterdir()
@@ -79,6 +116,16 @@ def build_entries(input_dir, existing_filenames, coordinates, explicit_title, ma
     )
     if not files:
         raise ValueError(f"No supported image files found in {input_dir}")
+    input_filenames = {filepath.name.casefold() for filepath in files}
+    unknown_locations = set(manual_locations) - input_filenames
+    if unknown_locations:
+        raise ValueError("Locations file does not match a photo: " + sorted(unknown_locations)[0])
+    if only_listed:
+        if not manual_locations:
+            raise ValueError("--only-listed requires --locations")
+        files = [filepath for filepath in files if filepath.name.casefold() in manual_locations]
+        if not files:
+            raise ValueError("None of the photos match the locations file")
     if explicit_title and len(files) != 1:
         raise ValueError("--title can only be used when adding one photograph")
     if coordinates and len(files) != 1:
@@ -96,7 +143,8 @@ def build_entries(input_dir, existing_filenames, coordinates, explicit_title, ma
         if filename in existing_filenames:
             raise ValueError(f"A map entry already uses {filename}; rename the new file before continuing")
 
-        gps = coordinates or get_gps(filepath)
+        manual_location = manual_locations.get(filepath.name.casefold())
+        gps = manual_location["coordinates"] if manual_location else coordinates or get_gps(filepath)
         if not gps:
             missing_gps.append(filepath.name)
             continue
@@ -108,7 +156,7 @@ def build_entries(input_dir, existing_filenames, coordinates, explicit_title, ma
         entries.append(
             {
                 "source": filepath,
-                "title": display_title(filepath, explicit_title),
+                "title": display_title(filepath, explicit_title or (manual_location or {}).get("title")),
                 "latitude": gps[0],
                 "longitude": gps[1],
                 "filename": filename,
@@ -173,6 +221,8 @@ def main():
     parser.add_argument("--publish", action="store_true", help="Upload files and append map pins")
     parser.add_argument("--coordinates", type=parse_coordinates, help="Manual latitude,longitude for one photo")
     parser.add_argument("--title", help="Custom title for one photo")
+    parser.add_argument("--locations", type=Path, help="CSV overrides with filename,title,lat,lon for photos without GPS")
+    parser.add_argument("--only-listed", action="store_true", help="Add only photos named in --locations")
     parser.add_argument("--max-width", type=int, default=1200, help="Full image width (default: 1200)")
     parser.add_argument("--quality", type=int, default=80, help="JPEG quality (default: 80)")
     parser.add_argument("--csv", type=Path, default=DEFAULT_CSV_PATH, help="Map CSV path")
@@ -187,11 +237,14 @@ def main():
         parser.error("--quality must be between 1 and 100")
 
     try:
+        manual_locations = read_locations(args.locations) if args.locations else {}
         entries = build_entries(
             input_dir,
             read_existing_filenames(args.csv),
             args.coordinates,
             args.title,
+            manual_locations,
+            args.only_listed,
             args.max_width,
             args.quality,
         )

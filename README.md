@@ -11,6 +11,10 @@ scripts/add-photos --input-dir "/path/to/new-trip"
 This is a preview: it creates no uploads or map changes. It shows the title,
 location, image size, and filename that each new pin will use. Every photo
 needs GPS metadata; for a single photo without it, add `--coordinates LAT,LON`.
+For a whole folder without GPS, create a small locations CSV with
+`filename,title,lat,lon` columns, then add `--locations /path/to/locations.csv`.
+Add `--only-listed` when that CSV should also limit the upload to just those
+named files.
 
 When the preview looks right, publish the photo pair and map pins with:
 
