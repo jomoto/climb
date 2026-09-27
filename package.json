@@ -1,0 +1,10 @@
+{
+  "name": "climb-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check where2climb/app.js && node --check where2climb/data.js && node --check where2climb/destination.js && node --check where2climb/locations.js",
+    "test": "node --test where2climb/tests/*.test.mjs",
+    "validate": "node --check where2climb/app.js && node --check where2climb/data.js && node --check where2climb/destination.js && node --check where2climb/locations.js && node --test where2climb/tests/*.test.mjs"
+  }
+}

@@ -1,9 +1,11 @@
 import {
   MONTHS,
   MONTH_LABELS,
+  destinationStyle,
   getDestinationById,
   getGoodMonths,
-} from "./data.js";
+} from "./data.js?v=20260927c";
+import { destinationLocation } from "./locations.js?v=20260927d";
 
 const params = new URLSearchParams(window.location.search);
 const destinationId = params.get("id");
@@ -11,6 +13,7 @@ const requestedMonth = params.get("month");
 const requestedStyle = params.get("style") || "all";
 const requestedRock = params.get("rock") || "all";
 const requestedPitch = params.get("pitch") || "all";
+const requestedSearch = params.get("q") || "";
 const requestedLat = params.get("lat");
 const requestedLng = params.get("lng");
 const requestedZoom = params.get("zoom");
@@ -58,6 +61,14 @@ const detailMetrics = document.querySelector("#detailMetrics");
 const detailMonth = document.querySelector("#detailMonth");
 const detailAllMonths = document.querySelector("#detailAllMonths");
 const detailSources = document.querySelector("#detailSources");
+const detailGuide = document.querySelector("#detailGuide");
+const pageDescription = document.querySelector("#pageDescription");
+const canonicalLink = document.querySelector("#canonicalLink");
+const ogTitle = document.querySelector("#ogTitle");
+const ogDescription = document.querySelector("#ogDescription");
+const ogUrl = document.querySelector("#ogUrl");
+const twitterTitle = document.querySelector("#twitterTitle");
+const twitterDescription = document.querySelector("#twitterDescription");
 
 const destination = getDestinationById(destinationId);
 
@@ -70,6 +81,7 @@ const resolvedMonth = sanitizeMonth(requestedMonth) || sanitizeMonth(referrerMon
 const resolvedStyle = sanitizeQueryValue(getReferrerValue(referrerParams, "style"), ALLOWED_STYLES, safeStyle);
 const resolvedRock = sanitizeQueryValue(getReferrerValue(referrerParams, "rock"), ALLOWED_ROCKS, safeRock);
 const resolvedPitch = sanitizeQueryValue(getReferrerValue(referrerParams, "pitch"), ALLOWED_PITCH, safePitch);
+const resolvedSearch = String(getReferrerValue(referrerParams, "q") || requestedSearch).trim().slice(0, 80);
 const resolvedLat =
   getReferrerValue(referrerParams, "lat") ||
   requestedLat ||
@@ -82,114 +94,6 @@ const resolvedZoom =
   getReferrerValue(referrerParams, "zoom") ||
   requestedZoom ||
   null;
-
-const COUNTRY_BY_ID = {
-  ailefroide: "France",
-  "bow-valley": "Canada",
-  bugaboos: "Canada",
-  ceuse: "France",
-  chamonix: "France",
-  "costa-blanca": "Spain",
-  dolomites: "Italy",
-  "el-potrero-chico": "Mexico",
-  "el-salto": "Mexico",
-  "finale-ligure": "Italy",
-  frankenjura: "Germany",
-  "hatun-machay": "Peru",
-  kalymnos: "Greece",
-  lofoten: "Norway",
-  "mineral-del-chico": "Mexico",
-  paklenica: "Croatia",
-  "pena-de-bernal": "Mexico",
-  siurana: "Spain",
-  "skaha-bluffs": "Canada",
-  squamish: "Canada",
-  "todra-gorge": "Morocco",
-  "valle-dellorco": "Italy",
-  "verdon-gorge": "France",
-  arco: "Italy",
-  tafraoute: "Morocco",
-  margalef: "Spain",
-  leonidio: "Greece",
-  "mount-arapiles": "Australia",
-  liming: "China",
-  tsaranoro: "Madagascar",
-  "blue-mountains-au": "Australia",
-  "waterval-boven": "South Africa",
-  nowra: "Australia",
-  "frog-buttress": "Australia",
-  ogawayama: "Japan",
-  "wadi-rum": "Jordan",
-  albarracin: "Spain",
-  rodellar: "Spain",
-  alcaniz: "Spain",
-  quiros: "Spain",
-  fontainebleau: "France",
-  briancon: "France",
-  "les-calanques": "France",
-  buoux: "France",
-  tarn: "France",
-  cadarese: "Italy",
-  ogliastra: "Italy",
-  "val-di-mello": "Italy",
-  meteora: "Greece",
-  "athens-crags": "Greece",
-  lagada: "Greece",
-  bohuslan: "Sweden",
-  skien: "Norway",
-  vingsand: "Norway",
-  aland: "Finland",
-  "peak-district": "United Kingdom",
-  osp: "Slovenia",
-  omis: "Croatia",
-  "magic-wood": "Switzerland",
-  geyikbayiri: "Türkiye",
-  aladaglar: "Türkiye",
-  quetzaltenango: "Guatemala",
-  "cerro-quemado": "Guatemala",
-  itatim: "Brazil",
-  "el-chonta": "Peru",
-  yangshuo: "China",
-  palchan: "India",
-  aleo: "India",
-  "chichoga-road": "India",
-  "solang-valley": "India",
-  mizugaki: "Japan",
-  rocklands: "South Africa",
-  "djebel-zaghouan": "Tunisia",
-  "djebel-ressas": "Tunisia",
-  "oman-climbing": "Oman",
-  grampians: "Australia",
-  wanaka: "New Zealand",
-  "the-remarkables": "New Zealand",
-  "castle-hill": "New Zealand",
-  flatanger: "Norway",
-  "piedra-parada": "Argentina",
-  "serra-do-cipo": "Brazil",
-  "valle-de-los-condores": "Argentina",
-  "railay-tonsai": "Thailand",
-  longdong: "Taiwan",
-  "paynes-ford": "New Zealand",
-  "rocha-da-pena": "Portugal",
-  corsica: "France",
-  "valle-cochamo": "Chile",
-  frey: "Argentina",
-  "los-arenales": "Argentina",
-  suesca: "Colombia",
-  "chalten-massif": "Argentina",
-  "banff-national-park": "Canada",
-  riglos: "Spain",
-  "la-pedriza": "Spain",
-  cresciano: "Switzerland",
-  chironico: "Switzerland",
-  varazze: "Italy",
-  hampi: "India",
-  gastlosen: "Switzerland",
-  wendenstocke: "Switzerland",
-  "eldorado-grimsel": "Switzerland",
-  salbitschijen: "Switzerland",
-  lehn: "Switzerland",
-};
 
 if (!destination) {
   detailRoot.innerHTML = `
@@ -204,26 +108,54 @@ if (!destination) {
     month: resolvedMonth,
   };
 
+  updateMetadata();
   updateBackLink();
   render();
+
+  detailMonth.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-month]");
+    if (!button) return;
+
+    const nextMonth = sanitizeMonth(button.dataset.month);
+    if (!nextMonth || nextMonth === state.month) return;
+
+    state.month = nextMonth;
+    syncDetailUrl();
+    updateBackLink();
+    render();
+    detailMonth.querySelector(`[data-month="${nextMonth}"]`)?.focus();
+  });
 
   function render() {
     const peakSet = new Set(destination.primeMonths);
     const goodSet = new Set(getGoodMonths(destination));
-
+    const selectedMonthNote =
+      state.month === ALL_MONTH_KEY ? null : destination.monthlyNotes?.[state.month] || null;
+    const selectedMonthStatus =
+      state.month === ALL_MONTH_KEY
+        ? null
+        : peakSet.has(state.month)
+          ? "a peak month"
+          : goodSet.has(state.month)
+            ? "a good month"
+            : "off season";
     const selectedOverview =
-      (destination.monthlyNotes && destination.monthlyNotes[state.month]) || destination.overview;
+      state.month === ALL_MONTH_KEY
+        ? destination.overview
+        : selectedMonthNote ||
+          `${MONTH_LABELS[state.month]} is rated as ${selectedMonthStatus} for ${destination.name}. A month-specific write-up has not been added yet; use the season calendar as a planning signal and verify current local conditions.`;
     const extraNotes = Object.entries(destination.monthlyNotes || {}).filter(
-      ([monthKey]) => monthKey !== state.month
+      ([monthKey]) => state.month === ALL_MONTH_KEY || monthKey !== state.month
     );
+    const resolvedDestinationStyle = destinationStyle(destination);
 
     detailHero.innerHTML = `
       <h1>${escapeHtml(destination.name)}</h1>
       <p class="detail-subtitle">${escapeHtml(destination.mpAreaTitle)} (${escapeHtml(
-            locationLabel(destination)
-          )})</p>
+        destinationLocation(destination)
+      )})</p>
       <div class="chip-row">
-        <span class="chip">${escapeHtml(humanStyle(destination.predominantStyle))}</span>
+        <span class="chip">${escapeHtml(humanStyle(resolvedDestinationStyle))}</span>
         <span class="chip">${escapeHtml(destination.rockType || "Unknown")}</span>
         <span class="chip">${escapeHtml(humanPitch(destination.pitchType))}</span>
       </div>
@@ -232,15 +164,29 @@ if (!destination) {
     detailMonth.innerHTML = `
       <div class="season-head">
         <h2>Season Calendar</h2>
+        <button
+          class="season-all-button${state.month === ALL_MONTH_KEY ? " selected" : ""}"
+          type="button"
+          data-month="all"
+          aria-pressed="${state.month === ALL_MONTH_KEY}"
+        >All months</button>
       </div>
       <div class="season-grid">
         ${MONTHS.map((month) => {
           const status = peakSet.has(month.key) ? "peak" : goodSet.has(month.key) ? "good" : "off";
+          const statusLabel = status === "off" ? "Off season" : status === "peak" ? "Peak" : "Good";
           const isSelected = month.key === state.month;
           return `
-            <div class="season-cell ${status}${isSelected ? " selected" : ""}">
+            <button
+              class="season-cell ${status}${isSelected ? " selected" : ""}"
+              type="button"
+              data-month="${month.key}"
+              aria-label="${month.label}: ${statusLabel}"
+              aria-pressed="${isSelected}"
+            >
               <span class="month-name">${month.label.slice(0, 3)}</span>
-            </div>
+              <span class="visually-hidden">${statusLabel}</span>
+            </button>
           `;
         }).join("")}
       </div>
@@ -293,13 +239,20 @@ if (!destination) {
     `;
 
     detailAllMonths.innerHTML = `
-      <h2>Overview</h2>
+      <h2>${
+        state.month === ALL_MONTH_KEY
+          ? "Overview"
+          : selectedMonthNote
+            ? `${escapeHtml(MONTH_LABELS[state.month])} Notes`
+            : `${escapeHtml(MONTH_LABELS[state.month])} Season`
+      }</h2>
       <p>${escapeHtml(selectedOverview)}</p>
     `;
 
     if (extraNotes.length) {
+      detailSources.hidden = false;
       detailSources.innerHTML = `
-        <h2>Other Month Notes</h2>
+        <h2>${state.month === ALL_MONTH_KEY ? "Month Notes" : "Other Month Notes"}</h2>
         <ul class="source-list">
           ${extraNotes
             .map(
@@ -311,15 +264,31 @@ if (!destination) {
       `;
     } else {
       detailSources.innerHTML = "";
+      detailSources.hidden = true;
     }
+
+    const guideUrl = safeExternalUrl(destination.mpAreaUrl);
+    detailGuide.hidden = !guideUrl;
+    detailGuide.innerHTML = guideUrl
+      ? `
+          <div>
+            <h2>Reference Guide</h2>
+            <p>Continue planning with route details, access notes, and community updates.</p>
+          </div>
+          <a class="guide-link" href="${escapeHtml(guideUrl)}" target="_blank" rel="noopener noreferrer">
+            View ${escapeHtml(destination.mpAreaTitle || destination.name)} <span aria-hidden="true">↗</span>
+          </a>
+        `
+      : "";
   }
 
   function updateBackLink() {
     const backParams = new URLSearchParams();
-    backParams.set("month", resolvedMonth || "all");
+    backParams.set("month", state.month || "all");
     backParams.set("style", resolvedStyle);
     backParams.set("rock", resolvedRock);
     backParams.set("pitch", resolvedPitch);
+    if (resolvedSearch) backParams.set("q", resolvedSearch);
 
     const backLat = resolvedLat || requestedLat;
     const backLng = resolvedLng || requestedLng;
@@ -338,6 +307,33 @@ if (!destination) {
     }
 
     backToMap.href = `./index.html?${backParams.toString()}`;
+  }
+
+  function syncDetailUrl() {
+    const nextParams = new URLSearchParams(window.location.search);
+    nextParams.set("id", destination.id);
+    nextParams.set("month", state.month);
+    window.history.replaceState(null, "", `${window.location.pathname}?${nextParams.toString()}`);
+  }
+
+  function updateMetadata() {
+    const title = `${destination.name} Climbing Guide | Where2Climb`;
+    const resolvedStyle = destinationStyle(destination);
+    const stylePhrase =
+      resolvedStyle === "boulder" ? "bouldering" : `${humanStyle(resolvedStyle).toLowerCase()} climbing`;
+    const description = `Plan a climbing trip to ${destination.name}: best months, ${stylePhrase}, grades, classic routes, and travel logistics.`;
+    const canonicalUrl = `https://shinojomoto.com/where2climb/destination.html?id=${encodeURIComponent(
+      destination.id
+    )}`;
+
+    document.title = title;
+    pageDescription.setAttribute("content", description);
+    canonicalLink.setAttribute("href", canonicalUrl);
+    ogTitle.setAttribute("content", title);
+    ogDescription.setAttribute("content", description);
+    ogUrl.setAttribute("content", canonicalUrl);
+    twitterTitle.setAttribute("content", title);
+    twitterDescription.setAttribute("content", description);
   }
 }
 
@@ -369,9 +365,8 @@ function routeMixText(routeCounts = {}) {
 }
 
 function humanStyle(style) {
-  if (style === "mixed") {
-    return "Trad + Sport";
-  }
+  if (style === "boulder") return "Bouldering";
+  if (style === "mixed") return "Sport & Trad";
   return style === "trad" ? "Trad" : "Sport";
 }
 
@@ -386,13 +381,15 @@ function isSectorEntry(name) {
   return /\b(sector|routes|area|walls?|crags?|boulders|classics|gorge|cave)\b/.test(lower);
 }
 
-function locationLabel(destination) {
-  const region = destination.region || "";
-  if (typeof region === "string" && region.toLowerCase() !== "international") {
-    return region;
-  }
+function safeExternalUrl(value) {
+  if (!value) return null;
 
-  return COUNTRY_BY_ID[destination.id] || region || "Unknown";
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
 }
 
 function escapeHtml(value) {

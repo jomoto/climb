@@ -1,5 +1,13 @@
 # climb
 
+## Validate Where2Climb
+
+Run the JavaScript syntax checks and destination-data regression tests with:
+
+```bash
+npm run validate
+```
+
 ## Add photos to the climbing map
 
 For a new trip, place the original photos in one folder and run:

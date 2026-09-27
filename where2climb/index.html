@@ -3,14 +3,44 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Climb Atlas Planner</title>
+    <title>Where2Climb — Find Climbing Destinations by Season</title>
+    <meta
+      name="description"
+      content="Explore climbing destinations around the world by month, climbing style, rock type, and pitch length."
+    />
+    <meta name="theme-color" content="#0a1022" />
+    <link rel="canonical" href="https://shinojomoto.com/where2climb/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Where2Climb — Find Climbing Destinations by Season" />
+    <meta
+      property="og:description"
+      content="Explore climbing destinations around the world by season, style, rock type, and pitch length."
+    />
+    <meta property="og:url" content="https://shinojomoto.com/where2climb/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Where2Climb — Find Climbing Destinations by Season" />
+    <meta
+      name="twitter:description"
+      content="Explore climbing destinations around the world by season, style, rock type, and pitch length."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""
     />
-    <link rel="stylesheet" href="./styles.css?v=20260813b" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles.css?v=20260927c" />
   </head>
   <body class="map-page">
     <header class="topbar">
@@ -24,7 +54,16 @@
       </div>
 
       <div class="mobile-map-actions">
-        <span class="mobile-count" id="mobileDestinationCount">0 spots</span>
+        <button
+          class="mobile-results-toggle"
+          id="mobileResultsToggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="resultsPanel"
+        >
+          <span>Browse</span>
+          <span id="mobileDestinationCount" aria-live="polite" aria-atomic="true">0</span>
+        </button>
         <button class="filter-toggle" id="filterToggle" type="button" aria-expanded="false" aria-controls="topControls">
           Filters <span aria-hidden="true">+</span>
         </button>
@@ -62,21 +101,65 @@
         <div class="filter-group">
           <span>Pitch</span>
           <div class="pitch-toggle" id="pitchToggle" role="radiogroup" aria-label="Choose pitch type">
-            <button class="pitch-btn active" data-pitch="all">All</button>
-            <button class="pitch-btn" data-pitch="single">Single</button>
-            <button class="pitch-btn" data-pitch="multi">Multi</button>
+            <button class="pitch-btn active" type="button" role="radio" aria-checked="true" data-pitch="all">All</button>
+            <button class="pitch-btn" type="button" role="radio" aria-checked="false" data-pitch="single">Single</button>
+            <button class="pitch-btn" type="button" role="radio" aria-checked="false" data-pitch="multi">Multi</button>
           </div>
         </div>
 
         <div class="filter-group count-group">
           <span>Results</span>
-          <div class="count-pill" id="destinationCount">0 destinations</div>
+          <button
+            class="count-pill results-open-button"
+            id="resultsToggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="resultsPanel"
+          >
+            <span class="results-open-label">Browse</span>
+            <span id="destinationCount" aria-live="polite" aria-atomic="true">0 destinations</span>
+          </button>
         </div>
       </div>
     </header>
 
     <main class="map-stage" aria-label="Global climbing map">
       <div id="map"></div>
+
+      <aside class="results-panel" id="resultsPanel" aria-labelledby="resultsTitle" hidden>
+        <header class="results-panel-header">
+          <div>
+            <p class="panel-eyebrow">Trip ideas</p>
+            <h2 id="resultsTitle">Browse destinations</h2>
+          </div>
+          <button class="panel-close" id="resultsClose" type="button" aria-label="Close destination browser">×</button>
+        </header>
+
+        <div class="destination-search">
+          <label class="visually-hidden" for="destinationSearch">Search destinations</label>
+          <span class="search-icon" aria-hidden="true"></span>
+          <input
+            id="destinationSearch"
+            type="search"
+            inputmode="search"
+            autocomplete="off"
+            placeholder="Search place, region, or rock"
+          />
+          <button class="search-clear" id="searchClear" type="button" aria-label="Clear destination search" hidden>×</button>
+        </div>
+
+        <p class="results-summary" id="resultsSummary" aria-live="polite"></p>
+        <nav class="destination-list" id="destinationList" aria-label="Filtered destinations"></nav>
+        <footer class="results-panel-footer">
+          <button class="reset-filters" id="resetFilters" type="button">Reset all filters</button>
+        </footer>
+      </aside>
+
+      <div class="map-empty-state" id="mapEmptyState" hidden>
+        <strong>No destinations found</strong>
+        <span>Try a broader search or reset the filters.</span>
+        <button type="button" data-reset-filters>Reset filters</button>
+      </div>
 
       <div class="map-legend" id="mapLegend" aria-label="Marker legend">
         <span><i class="dot dot-sport"></i> Sport</span>
@@ -91,6 +174,10 @@
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
-    <script type="module" src="./app.js?v=11"></script>
+    <script
+      src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"
+      crossorigin=""
+    ></script>
+    <script type="module" src="./app.js?v=18"></script>
   </body>
 </html>

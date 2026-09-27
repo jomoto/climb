@@ -5,3 +5,5 @@ __pycache__/
 *.pyc
 scripts/venv/
 .claude/worktrees/
+node_modules/
+.pnpm-store/

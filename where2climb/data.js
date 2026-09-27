@@ -491,8 +491,8 @@ export const DESTINATIONS = [
     pitchType: "single",
     routeVolume: "1,710 climbs",
     gradeRange: "5.8 - 5.12",
-    overview: "Country and region: Southeast Utah canyon country near Moab, within the Bears Ears area managed by the .",
-    monthlyNotes: {"april": "Country and region: Southeast Utah canyon country near Moab, within the Bears Ears area managed by the .", "may": "May is the tail end of peak spring season, with highs of 75\u201385\u00b0F at 5,765 feet elevation. Shade-chasing keeps things comfortable, though late May begins the transition toward summer heat. The setting \u2014 beneath the Six Shooter peaks with Canyonlands as a backdrop \u2014 is as dramatic as the climbing."},
+    overview: "Indian Creek sits near Moab in southeast Utah's canyon country, beneath the Six Shooter peaks and close to Canyonlands National Park.",
+    monthlyNotes: {"april": "Indian Creek sits near Moab in southeast Utah's canyon country, beneath the Six Shooter peaks and close to Canyonlands National Park.", "may": "May is the tail end of peak spring season, with highs of 75\u201385\u00b0F at 5,765 feet elevation. Shade-chasing keeps things comfortable, though late May begins the transition toward summer heat. The setting \u2014 beneath the Six Shooter peaks with Canyonlands as a backdrop \u2014 is as dramatic as the climbing."},
     source: "core",
     mpAreaTitle: "Indian Creek",
     mpAreaUrl: "https://www.mountainproject.com/area/105716763/indian-creek",
@@ -3928,20 +3928,14 @@ export function getDestinationById(id) {
   }
 
   const normalizedRequest = slugify(id);
+  if (!normalizedRequest) return undefined;
+
   const slugMatch = DESTINATIONS.find(
     (destination) =>
       slugify(destination.id) === normalizedRequest ||
       slugify(destination.name) === normalizedRequest
   );
   if (slugMatch) return slugMatch;
-
-  const partialMatch = DESTINATIONS.find(
-    (destination) => {
-      const destinationSlug = slugify(destination.name);
-      return destinationSlug.includes(normalizedRequest) || normalizedRequest.includes(destinationSlug);
-    }
-  );
-  if (partialMatch) return partialMatch;
 
   return undefined;
 }
@@ -3976,11 +3970,34 @@ export function isPrimaryBoulderingDestination(destination) {
   return boulderCount === largestStyleCount && boulderCount / routeStyleTotal >= PRIMARY_BOULDER_MIN_SHARE;
 }
 
+export function destinationStyle(destination) {
+  if (isPrimaryBoulderingDestination(destination)) return "boulder";
+
+  const routeCounts = destination.routeCounts || {};
+  const total = Object.values(routeCounts).reduce((sum, value) => sum + (Number(value) || 0), 0);
+
+  if (total > 0) {
+    const tradShare = routeStyleCount(destination, "trad") / total;
+    const sportShare = routeStyleCount(destination, "sport") / total;
+
+    if (tradShare > 0.9) return "trad";
+    if (sportShare > 0.9) return "sport";
+  }
+
+  if (["sport", "trad", "mixed"].includes(destination.predominantStyle)) {
+    return destination.predominantStyle;
+  }
+
+  const hasSport = destination.styles?.includes("sport");
+  const hasTrad = destination.styles?.includes("trad");
+  if (hasSport && hasTrad) return "mixed";
+  if (hasTrad) return "trad";
+  return "sport";
+}
+
 export function styleMatches(destination, style) {
   if (style === "all") return true;
-  if (style === "boulder") return isPrimaryBoulderingDestination(destination);
-  if (style === "mixed") return destination.styles.includes("sport") || destination.styles.includes("trad");
-  return destination.styles.includes(style);
+  return destinationStyle(destination) === style;
 }
 
 export function monthScore(destination, monthKey) {
@@ -4005,18 +4022,25 @@ export function isGoodMonth(destination, monthKey) {
   return getGoodMonths(destination).includes(monthKey);
 }
 
-export function rockTypeGroup(rockType) {
+export function rockTypeGroups(rockType) {
   const lower = (rockType || "").toLowerCase();
-  if (lower.includes("granite") || lower.includes("gneiss") || lower.includes("syenite") || lower.includes("schist")) return "granite";
-  if (lower.includes("limestone") || lower.includes("dolomite")) return "limestone";
-  if (lower.includes("sandstone")) return "sandstone";
-  if (lower.includes("volcanic") || lower.includes("tuff") || lower.includes("rhyolite") || lower.includes("dacite") || lower.includes("phonolite")) return "volcanic";
-  return "other";
+  const groups = [];
+
+  if (lower.includes("granite") || lower.includes("gneiss") || lower.includes("syenite") || lower.includes("schist")) groups.push("granite");
+  if (lower.includes("limestone") || lower.includes("dolomite")) groups.push("limestone");
+  if (lower.includes("sandstone")) groups.push("sandstone");
+  if (lower.includes("volcanic") || lower.includes("tuff") || lower.includes("rhyolite") || lower.includes("dacite") || lower.includes("phonolite")) groups.push("volcanic");
+
+  return groups.length ? groups : ["other"];
+}
+
+export function rockTypeGroup(rockType) {
+  return rockTypeGroups(rockType)[0];
 }
 
 export function rockTypeMatches(destination, filter) {
   if (filter === "all") return true;
-  return rockTypeGroup(destination.rockType) === filter;
+  return rockTypeGroups(destination.rockType).includes(filter);
 }
 
 export function pitchTypeMatches(destination, filter) {
