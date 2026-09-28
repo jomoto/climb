@@ -18,6 +18,7 @@ test("destination records have stable IDs, coordinates, and season data", () => 
     assert.match(destination.id, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     assert.ok(Number.isFinite(destination.lat) && destination.lat >= -90 && destination.lat <= 90);
     assert.ok(Number.isFinite(destination.lng) && destination.lng >= -180 && destination.lng <= 180);
+    assert.equal(destination.primeMonths.length, 2, `${destination.id} must have two peak months`);
 
     for (const month of MONTHS) {
       assert.ok(
@@ -87,4 +88,36 @@ test("international destinations have searchable country labels", () => {
   }
 
   assert.equal(destinationLocation(getDestinationById("fontainebleau")), "France");
+});
+
+test("requested Mountain Project areas are available with canonical source links", () => {
+  const requestedAreas = [
+    {
+      id: "bubbs-creek-wall",
+      url: "https://www.mountainproject.com/area/109056973/bubbs-creek-wall",
+      style: "trad",
+    },
+    {
+      id: "patterson-left",
+      url: "https://www.mountainproject.com/area/114373736/patterson-left",
+      style: "trad",
+    },
+    {
+      id: "trout-creek",
+      url: "https://www.mountainproject.com/area/106505473/trout-creek",
+      style: "trad",
+    },
+    {
+      id: "the-grail",
+      url: "https://www.mountainproject.com/area/111372538/the-grail",
+      style: "sport",
+    },
+  ];
+
+  for (const expected of requestedAreas) {
+    const destination = getDestinationById(expected.id);
+    assert.ok(destination, expected.id);
+    assert.equal(destination.mpAreaUrl, expected.url);
+    assert.equal(destinationStyle(destination), expected.style);
+  }
 });
