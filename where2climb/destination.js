@@ -4,8 +4,8 @@ import {
   destinationStyle,
   getDestinationById,
   getGoodMonths,
-} from "./data.js?v=20260927e";
-import { destinationLocation } from "./locations.js?v=20260927d";
+} from "./data.js?v=20260927f";
+import { destinationLocation } from "./locations.js?v=20260927e";
 
 const params = new URLSearchParams(window.location.search);
 const destinationId = params.get("id");

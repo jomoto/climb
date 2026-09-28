@@ -74,7 +74,6 @@ const COUNTRY_BY_ID = {
   rocklands: "South Africa",
   "djebel-zaghouan": "Tunisia",
   "djebel-ressas": "Tunisia",
-  "oman-climbing": "Oman",
   grampians: "Australia",
   wanaka: "New Zealand",
   "the-remarkables": "New Zealand",

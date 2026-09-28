@@ -121,3 +121,30 @@ test("requested Mountain Project areas are available with canonical source links
     assert.equal(destinationStyle(destination), expected.style);
   }
 });
+
+test("regional umbrella records are not exposed as destinations", () => {
+  const removedRegionalIds = [
+    "oman-climbing",
+    "southern-arizona",
+    "eastern-sierra",
+    "ct-bouldering",
+    "central-valley",
+    "western-mountains",
+    "eastern-ma",
+    "western-nevada",
+    "northwest",
+    "north-central",
+    "southern-mountains-region",
+    "piedmont-region",
+    "south-central-pa",
+    "southeastern-lowlands",
+    "wasatch-range",
+    "southeast-utah",
+    "central-west-cascades-seattle",
+    "central-east-cascades-wenatchee-leavenworth",
+  ];
+
+  for (const id of removedRegionalIds) {
+    assert.equal(getDestinationById(id), undefined, id);
+  }
+});
