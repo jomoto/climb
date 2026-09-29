@@ -4,8 +4,8 @@ import {
   destinationStyle,
   getDestinationById,
   getGoodMonths,
-} from "./data.js?v=20260927f";
-import { destinationLocation } from "./locations.js?v=20260927e";
+} from "./data.js?v=20260929a";
+import { destinationLocation } from "./locations.js?v=20260929a";
 
 const params = new URLSearchParams(window.location.search);
 const destinationId = params.get("id");
@@ -138,7 +138,7 @@ if (!destination) {
           ? "a peak month"
           : goodSet.has(state.month)
             ? "a good month"
-            : "off season";
+            : "a less ideal month";
     const selectedOverview =
       state.month === ALL_MONTH_KEY
         ? destination.overview
@@ -174,7 +174,7 @@ if (!destination) {
       <div class="season-grid">
         ${MONTHS.map((month) => {
           const status = peakSet.has(month.key) ? "peak" : goodSet.has(month.key) ? "good" : "off";
-          const statusLabel = status === "off" ? "Off season" : status === "peak" ? "Peak" : "Good";
+          const statusLabel = status === "off" ? "Less ideal" : status === "peak" ? "Peak" : "Good";
           const isSelected = month.key === state.month;
           return `
             <button
@@ -193,7 +193,7 @@ if (!destination) {
       <div class="season-legend-row">
         <span><i class="dot legend-peak"></i> Peak</span>
         <span><i class="dot legend-good"></i> Good</span>
-        <span><i class="dot legend-off"></i> Off season</span>
+        <span><i class="dot legend-off"></i> Less ideal</span>
       </div>
     `;
 
@@ -211,7 +211,7 @@ if (!destination) {
           </div>
           <div>
             <h3>Style Mix</h3>
-            <p>${escapeHtml(routeMixText(destination.routeCounts))}</p>
+            <p>${escapeHtml(routeMixText(destination))}</p>
           </div>
           <div>
             <h3>Grade Range</h3>
@@ -337,18 +337,20 @@ if (!destination) {
   }
 }
 
-function routeMixText(routeCounts = {}) {
+function routeMixText(destination) {
+  const routeCounts = destination.routeCounts || {};
   const styles = [
     { label: "sport", count: Number(routeCounts.sport) || 0 },
     { label: "trad", count: Number(routeCounts.trad) || 0 },
     { label: "boulder", count: Number(routeCounts.boulder) || 0 },
+    { label: "DWS", count: Number(routeCounts.dws) || 0 },
   ].filter((style) => style.count > 0);
 
   if (styles.length) {
     const total = styles.reduce((sum, style) => sum + style.count, 0);
     let allocatedPct = 0;
 
-    return styles
+    const mix = styles
       .sort((a, b) => b.count - a.count)
       .map((style, index) => {
         const pct =
@@ -359,9 +361,18 @@ function routeMixText(routeCounts = {}) {
         return `${pct}% ${style.label}`;
       })
       .join(" / ");
+    if (destination.routeCountsPartial) return `Listed subset: ${mix}`;
+    if (destination.routeCountsEstimated) return `Estimated: ${mix}`;
+    return mix;
   }
 
-  return "Route mix unavailable";
+  const styleLabels = { sport: "sport", trad: "trad", boulder: "bouldering" };
+  const listedStyles = (destination.styles || [])
+    .map((style) => styleLabels[style])
+    .filter(Boolean);
+  return listedStyles.length
+    ? `${listedStyles.join(", ")} (breakdown unavailable)`
+    : "Route mix unavailable";
 }
 
 function humanStyle(style) {

@@ -1,3 +1,5 @@
+import { WORLD_CLASS_DESTINATIONS } from "./world-class-destinations.js?v=20260929a";
+
 export const MONTHS = [
   { key: "january", label: "January" },
   { key: "february", label: "February" },
@@ -3639,6 +3641,7 @@ export const DESTINATIONS = [
       {"name":"Vesper","grade":"5.12b","type":"sport"}
     ],
   },
+  ...WORLD_CLASS_DESTINATIONS,
 ];
 
 
