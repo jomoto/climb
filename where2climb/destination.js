@@ -140,8 +140,7 @@ if (!destination) {
     detailMonth.innerHTML = `
       <div class="season-head">
         <div>
-          <p class="section-index">01 / Season</p>
-          <h2>Month by month</h2>
+          <h2>Best months</h2>
         </div>
         <p class="season-summary">Peak: ${escapeHtml(peakMonthLabel || "Not listed")}</p>
       </div>
@@ -170,7 +169,6 @@ if (!destination) {
 
     detailMetrics.innerHTML = `
       <article class="stats-card">
-        <p class="section-index">02 / Area profile</p>
         <h2>At a glance</h2>
         <div class="stats-grid">
           <div>
@@ -193,7 +191,6 @@ if (!destination) {
       </article>
       ${routes.length ? `
       <article class="stats-card classic-routes-card">
-        <p class="section-index">03 / Local index</p>
         <h2>${classicLabel}</h2>
         <ul class="classic-routes-list">
           ${routes.map((r) => `
@@ -208,7 +205,6 @@ if (!destination) {
     `;
 
     detailAllMonths.innerHTML = `
-      <p class="section-index">04 / Field guide</p>
       <h2>Overview</h2>
       <p>${escapeHtml(cleanedOverview)}</p>
     `;
@@ -216,7 +212,6 @@ if (!destination) {
     if (extraNotes.length) {
       detailSources.hidden = false;
       detailSources.innerHTML = `
-        <p class="section-index">05 / Seasonal notes</p>
         <h2>Notes by month</h2>
         <ul class="source-list">
           ${extraNotes
