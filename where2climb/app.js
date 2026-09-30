@@ -9,7 +9,7 @@ import {
   styleMatches,
   rockTypeMatches,
   pitchTypeMatches,
-} from "./data.js?v=20260929a";
+} from "./data.js?v=20260929b";
 import { destinationLocation } from "./locations.js?v=20260929a";
 
 const ALLOWED_STYLES = new Set(["all", "trad", "sport", "boulder", "mixed"]);

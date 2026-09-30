@@ -4,7 +4,7 @@ import {
   destinationStyle,
   getDestinationById,
   getGoodMonths,
-} from "./data.js?v=20260929a";
+} from "./data.js?v=20260929b";
 import { destinationLocation } from "./locations.js?v=20260929a";
 
 const params = new URLSearchParams(window.location.search);
@@ -119,6 +119,8 @@ if (!destination) {
     );
     const extraNotes = Object.entries(cleanedMonthNotes);
     const resolvedDestinationStyle = destinationStyle(destination);
+    const resolvedDestinationStyleLabel =
+      destination.styleSummary || humanStyle(resolvedDestinationStyle);
     const location = destinationLocation(destination);
     const peakMonths = destination.primeMonths.map((month) => MONTH_LABELS[month]).filter(Boolean);
     const peakMonthLabel = formatList(peakMonths);
@@ -126,12 +128,12 @@ if (!destination) {
     detailHero.innerHTML = `
       <p class="section-index">Climbing area / ${escapeHtml(location)}</p>
       <h1>${escapeHtml(destination.name)}</h1>
-      <p class="detail-lead">${escapeHtml(humanStyle(resolvedDestinationStyle))} on ${escapeHtml(
+      <p class="detail-lead">${escapeHtml(resolvedDestinationStyleLabel)} on ${escapeHtml(
         destination.rockType || "unknown rock"
       )}. Best conditions typically arrive in ${escapeHtml(peakMonthLabel || "the listed peak season")}.</p>
       <div class="metadata-line" aria-label="Area details">
         <span>${escapeHtml(location)}</span>
-        <span>${escapeHtml(humanStyle(resolvedDestinationStyle))}</span>
+        <span>${escapeHtml(resolvedDestinationStyleLabel)}</span>
         <span>${escapeHtml(destination.rockType || "Unknown rock")}</span>
         <span>${escapeHtml(humanPitch(destination.pitchType))}</span>
       </div>
@@ -292,6 +294,8 @@ if (!destination) {
 }
 
 function routeMixText(destination) {
+  if (destination.styleSummary) return destination.styleSummary;
+
   const routeCounts = destination.routeCounts || {};
   const styles = [
     { label: "sport", count: Number(routeCounts.sport) || 0 },
