@@ -1,4 +1,5 @@
 import { WORLD_CLASS_DESTINATIONS } from "./world-class-destinations.js?v=20260929a";
+import { DESTINATION_TLDRS } from "./tldrs.js?v=20260930a";
 
 export const MONTHS = [
   { key: "january", label: "January" },
@@ -3184,7 +3185,7 @@ export const DESTINATIONS = [
     lng: -68.25807,
     styles: ["trad"],
     predominantStyle: "trad",
-    rockType: "Unknown",
+    rockType: "Granite",
     pitchType: "both",
     routeVolume: "423 climbs",
     gradeRange: "5.6-5.13",
@@ -3643,7 +3644,10 @@ export const DESTINATIONS = [
     ],
   },
   ...WORLD_CLASS_DESTINATIONS,
-];
+].map((destination) => ({
+  ...destination,
+  tldr: DESTINATION_TLDRS[destination.id],
+}));
 
 
 export function getDestinationById(id) {

@@ -860,6 +860,17 @@ select {
   font-size: clamp(1rem, 1.6vw, 1.25rem);
 }
 
+.tldr-label {
+  display: inline-block;
+  margin-right: 0.75rem;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.68em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .metadata-line {
   display: flex;
   flex-wrap: wrap;
@@ -961,6 +972,15 @@ select {
   grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.75fr);
   gap: clamp(3rem, 7vw, 7rem);
   padding: clamp(4rem, 7vw, 6.5rem) 0 7rem;
+}
+
+.detail-content-grid--sidebar-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.detail-content-grid--sidebar-only .detail-sidebar {
+  padding-left: 0;
+  border-left: 0;
 }
 
 .detail-story,

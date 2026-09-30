@@ -71,6 +71,30 @@ test("destination records have stable IDs, coordinates, and season data", () => 
   }
 });
 
+test("every destination has a concise original TLDR", () => {
+  const bannedPlaceholderPhrases = [
+    "high-potential destination",
+    "solid option when",
+    "top climbing area",
+    "trad on unknown",
+  ];
+
+  for (const destination of DESTINATIONS) {
+    assert.equal(typeof destination.tldr, "string", `${destination.id} needs a TLDR`);
+    assert.ok(destination.tldr.trim().length > 0, `${destination.id} needs a TLDR`);
+    assert.ok(
+      destination.tldr.trim().split(/\s+/).length < 25,
+      `${destination.id} TLDR must stay under 25 words`
+    );
+    assert.ok(
+      bannedPlaceholderPhrases.every(
+        (phrase) => !destination.tldr.toLowerCase().includes(phrase)
+      ),
+      `${destination.id} still has placeholder copy`
+    );
+  }
+});
+
 test("Sport & Trad requires meaningful data for both styles", () => {
   const matches = DESTINATIONS.filter((destination) => styleMatches(destination, "mixed"));
 

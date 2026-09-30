@@ -4,7 +4,7 @@ import {
   destinationStyle,
   getDestinationById,
   getGoodMonths,
-} from "./data.js?v=20260929b";
+} from "./data.js?v=20260930a";
 import { destinationLocation } from "./locations.js?v=20260929a";
 
 const params = new URLSearchParams(window.location.search);
@@ -122,19 +122,22 @@ if (!destination) {
     const resolvedDestinationStyleLabel =
       destination.styleSummary || humanStyle(resolvedDestinationStyle);
     const location = destinationLocation(destination);
+    const rockType =
+      destination.rockType && destination.rockType.toLowerCase() !== "unknown"
+        ? destination.rockType
+        : "Rock varies";
+    const tldr = destination.tldr || cleanedOverview;
     const peakMonths = destination.primeMonths.map((month) => MONTH_LABELS[month]).filter(Boolean);
     const peakMonthLabel = formatList(peakMonths);
 
     detailHero.innerHTML = `
       <p class="section-index">Climbing area / ${escapeHtml(location)}</p>
       <h1>${escapeHtml(destination.name)}</h1>
-      <p class="detail-lead">${escapeHtml(resolvedDestinationStyleLabel)} on ${escapeHtml(
-        destination.rockType || "unknown rock"
-      )}.</p>
+      <p class="detail-lead"><span class="tldr-label">TL;DR</span> ${escapeHtml(tldr)}</p>
       <div class="metadata-line" aria-label="Area details">
         <span>${escapeHtml(location)}</span>
         <span>${escapeHtml(resolvedDestinationStyleLabel)}</span>
-        <span>${escapeHtml(destination.rockType || "Unknown rock")}</span>
+        <span>${escapeHtml(rockType)}</span>
         <span>${escapeHtml(humanPitch(destination.pitchType))}</span>
       </div>
     `;
@@ -206,10 +209,14 @@ if (!destination) {
       ` : ""}
     `;
 
-    detailAllMonths.innerHTML = `
-      <h2>Overview</h2>
-      <p>${escapeHtml(cleanedOverview)}</p>
-    `;
+    const showExtraBeta = isUsefulExtraBeta(cleanedOverview, tldr);
+    detailAllMonths.hidden = !showExtraBeta;
+    detailAllMonths.innerHTML = showExtraBeta
+      ? `
+          <h2>Extra beta</h2>
+          <p>${escapeHtml(cleanedOverview)}</p>
+        `
+      : "";
 
     if (extraNotes.length) {
       detailSources.hidden = false;
@@ -228,6 +235,12 @@ if (!destination) {
       detailSources.innerHTML = "";
       detailSources.hidden = true;
     }
+
+    const detailStory = detailAllMonths.closest(".detail-story");
+    const detailContentGrid = detailAllMonths.closest(".detail-content-grid");
+    const storyHasContent = showExtraBeta || extraNotes.length > 0;
+    detailStory.hidden = !storyHasContent;
+    detailContentGrid.classList.toggle("detail-content-grid--sidebar-only", !storyHasContent);
 
     const guideUrl = safeExternalUrl(destination.mpAreaUrl);
     detailGuide.hidden = !guideUrl;
@@ -277,7 +290,7 @@ if (!destination) {
     const resolvedStyle = destinationStyle(destination);
     const stylePhrase =
       resolvedStyle === "boulder" ? "bouldering" : `${humanStyle(resolvedStyle).toLowerCase()} climbing`;
-    const description = `Plan a climbing trip to ${destination.name}: best months, ${stylePhrase}, grades, classic routes, and travel logistics.`;
+    const description = destination.tldr || `Plan a climbing trip to ${destination.name}: best months, ${stylePhrase}, grades, classic routes, and travel logistics.`;
     const canonicalUrl = `https://shinojomoto.com/where2climb/destination.html?id=${encodeURIComponent(
       destination.id
     )}`;
@@ -291,6 +304,21 @@ if (!destination) {
     twitterTitle.setAttribute("content", title);
     twitterDescription.setAttribute("content", description);
   }
+}
+
+function isUsefulExtraBeta(overview, tldr) {
+  if (!overview || normalizeCopy(overview) === normalizeCopy(tldr)) return false;
+
+  const genericPrefixes = [
+    "country and region:",
+    "high-potential destination",
+    "overview.",
+    "solid option",
+    "top climbing area",
+    "typical april weather:",
+  ];
+  const normalizedOverview = overview.trim().toLowerCase();
+  return !genericPrefixes.some((prefix) => normalizedOverview.startsWith(prefix));
 }
 
 function routeMixText(destination) {
