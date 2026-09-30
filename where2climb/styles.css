@@ -979,7 +979,6 @@ select {
 .detail-all-months,
 .detail-sources,
 .detail-guide,
-.detail-planning-note,
 .stats-card {
   background: transparent;
 }
@@ -1121,24 +1120,6 @@ select {
 
 .guide-link:hover {
   color: #ff966f;
-}
-
-.detail-planning-note {
-  padding: 0.25rem 0 0.25rem 1rem;
-  border-left: 2px solid var(--accent);
-}
-
-.detail-planning-note strong {
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.detail-planning-note p {
-  margin-top: 0.45rem;
-  color: var(--muted);
-  font-size: 0.86rem;
 }
 
 @media (max-width: 980px) {
