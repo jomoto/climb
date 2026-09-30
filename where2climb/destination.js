@@ -104,27 +104,9 @@ if (!destination) {
     </section>
   `;
 } else {
-  const state = {
-    month: resolvedMonth,
-  };
-
   updateMetadata();
   updateBackLink();
   render();
-
-  detailMonth.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-month]");
-    if (!button) return;
-
-    const nextMonth = sanitizeMonth(button.dataset.month);
-    if (!nextMonth || nextMonth === state.month) return;
-
-    state.month = nextMonth;
-    syncDetailUrl();
-    updateBackLink();
-    render();
-    detailMonth.querySelector(`[data-month="${nextMonth}"]`)?.focus();
-  });
 
   function render() {
     const peakSet = new Set(destination.primeMonths);
@@ -135,23 +117,7 @@ if (!destination) {
         .map(([monthKey, note]) => [monthKey, cleanEditorialText(note)])
         .filter(([, note]) => note && normalizeCopy(note) !== normalizeCopy(cleanedOverview))
     );
-    const selectedMonthNote = state.month === ALL_MONTH_KEY ? null : cleanedMonthNotes[state.month] || null;
-    const selectedMonthStatus =
-      state.month === ALL_MONTH_KEY
-        ? null
-        : peakSet.has(state.month)
-          ? "a peak month"
-          : goodSet.has(state.month)
-            ? "a good month"
-            : "a less ideal month";
-    const selectedOverview =
-      state.month === ALL_MONTH_KEY
-        ? cleanedOverview
-        : selectedMonthNote ||
-          `${MONTH_LABELS[state.month]} is rated as ${selectedMonthStatus} for ${destination.name}. A month-specific write-up has not been added yet; use the season calendar as a planning signal and verify current local conditions.`;
-    const extraNotes = Object.entries(cleanedMonthNotes).filter(
-      ([monthKey]) => state.month === ALL_MONTH_KEY || monthKey !== state.month
-    );
+    const extraNotes = Object.entries(cleanedMonthNotes);
     const resolvedDestinationStyle = destinationStyle(destination);
     const location = destinationLocation(destination);
     const peakMonths = destination.primeMonths.map((month) => MONTH_LABELS[month]).filter(Boolean);
@@ -178,29 +144,16 @@ if (!destination) {
           <h2>Month by month</h2>
         </div>
         <p class="season-summary">Peak: ${escapeHtml(peakMonthLabel || "Not listed")}</p>
-        <button
-          class="season-all-button${state.month === ALL_MONTH_KEY ? " selected" : ""}"
-          type="button"
-          data-month="all"
-          aria-pressed="${state.month === ALL_MONTH_KEY}"
-        >View all months</button>
       </div>
-      <div class="season-grid">
+      <div class="season-grid" aria-label="Season quality by month">
         ${MONTHS.map((month) => {
           const status = peakSet.has(month.key) ? "peak" : goodSet.has(month.key) ? "good" : "off";
           const statusLabel = status === "off" ? "Less ideal" : status === "peak" ? "Peak" : "Good";
-          const isSelected = month.key === state.month;
           return `
-            <button
-              class="season-cell ${status}${isSelected ? " selected" : ""}"
-              type="button"
-              data-month="${month.key}"
-              aria-label="${month.label}: ${statusLabel}"
-              aria-pressed="${isSelected}"
-            >
+            <div class="season-cell ${status}" aria-label="${month.label}: ${statusLabel}">
               <span class="month-name">${month.label.slice(0, 3)}</span>
               <span class="visually-hidden">${statusLabel}</span>
-            </button>
+            </div>
           `;
         }).join("")}
       </div>
@@ -256,21 +209,15 @@ if (!destination) {
 
     detailAllMonths.innerHTML = `
       <p class="section-index">04 / Field guide</p>
-      <h2>${
-        state.month === ALL_MONTH_KEY
-          ? "Overview"
-          : selectedMonthNote
-            ? `${escapeHtml(MONTH_LABELS[state.month])} Notes`
-            : `${escapeHtml(MONTH_LABELS[state.month])} Season`
-      }</h2>
-      <p>${escapeHtml(selectedOverview)}</p>
+      <h2>Overview</h2>
+      <p>${escapeHtml(cleanedOverview)}</p>
     `;
 
     if (extraNotes.length) {
       detailSources.hidden = false;
       detailSources.innerHTML = `
         <p class="section-index">05 / Seasonal notes</p>
-        <h2>${state.month === ALL_MONTH_KEY ? "Notes by month" : "Other month notes"}</h2>
+        <h2>Notes by month</h2>
         <ul class="source-list">
           ${extraNotes
             .map(
@@ -303,7 +250,7 @@ if (!destination) {
 
   function updateBackLink() {
     const backParams = new URLSearchParams();
-    backParams.set("month", state.month || "all");
+    backParams.set("month", resolvedMonth || "all");
     backParams.set("style", resolvedStyle);
     backParams.set("rock", resolvedRock);
     backParams.set("pitch", resolvedPitch);
@@ -326,13 +273,6 @@ if (!destination) {
     }
 
     backToMap.href = `./index.html?${backParams.toString()}`;
-  }
-
-  function syncDetailUrl() {
-    const nextParams = new URLSearchParams(window.location.search);
-    nextParams.set("id", destination.id);
-    nextParams.set("month", state.month);
-    window.history.replaceState(null, "", `${window.location.pathname}?${nextParams.toString()}`);
   }
 
   function updateMetadata() {

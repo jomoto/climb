@@ -907,7 +907,7 @@ select {
 
 .season-head {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto;
   align-items: end;
   gap: 1.5rem;
   margin-bottom: 1.35rem;
@@ -928,24 +928,6 @@ select {
   font-size: 0.72rem;
 }
 
-.season-all-button {
-  padding: 0 0 0.2rem;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 0.67rem;
-  text-transform: uppercase;
-}
-
-.season-all-button:hover,
-.season-all-button.selected {
-  border-bottom-color: var(--accent);
-  color: var(--text);
-}
-
 .season-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -955,6 +937,8 @@ select {
 
 .season-cell {
   min-height: 62px;
+  display: grid;
+  place-items: center;
   padding: 0.7rem 0.3rem;
   border: 0;
   border-right: 1px solid var(--line);
@@ -962,10 +946,6 @@ select {
   border-radius: 0;
   background: rgba(25, 30, 44, 0.55);
   color: var(--text);
-}
-
-.season-cell:hover {
-  background: rgba(255, 255, 255, 0.04);
 }
 
 .season-cell.peak {
@@ -976,10 +956,6 @@ select {
 .season-cell.good {
   border-bottom-color: var(--good);
   background: rgba(212, 160, 67, 0.08);
-}
-
-.season-cell.selected {
-  box-shadow: inset 0 0 0 1px var(--text);
 }
 
 .month-name {
