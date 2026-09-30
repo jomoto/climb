@@ -43,16 +43,20 @@ const state = {
 };
 
 const monthSelect = document.querySelector("#monthSelect");
+const monthSelectSheet = document.querySelector("#monthSelectSheet");
 const styleSelect = document.querySelector("#styleSelect");
 const rockSelect = document.querySelector("#rockSelect");
 const pitchToggle = document.querySelector("#pitchToggle");
 const destinationCount = document.querySelector("#destinationCount");
-const mobileDestinationCount = document.querySelector("#mobileDestinationCount");
+const filterDoneCount = document.querySelector("#filterDoneCount");
+const filterActiveCount = document.querySelector("#filterActiveCount");
+const resultsPanelCount = document.querySelector("#resultsPanelCount");
 const mapElement = document.querySelector("#map");
-const topbar = document.querySelector(".topbar");
+const topControls = document.querySelector("#topControls");
 const filterToggle = document.querySelector("#filterToggle");
+const filterClose = document.querySelector("#filterClose");
+const filterDone = document.querySelector("#filterDone");
 const resultsToggle = document.querySelector("#resultsToggle");
-const mobileResultsToggle = document.querySelector("#mobileResultsToggle");
 const resultsPanel = document.querySelector("#resultsPanel");
 const resultsClose = document.querySelector("#resultsClose");
 const resultsSummary = document.querySelector("#resultsSummary");
@@ -60,8 +64,14 @@ const destinationList = document.querySelector("#destinationList");
 const destinationSearch = document.querySelector("#destinationSearch");
 const searchClear = document.querySelector("#searchClear");
 const resetFilters = document.querySelector("#resetFilters");
+const resetFiltersTop = document.querySelector("#resetFiltersTop");
 const mapEmptyState = document.querySelector("#mapEmptyState");
+const panelBackdrop = document.querySelector("#panelBackdrop");
+const legendToggle = document.querySelector("#legendToggle");
+const mapLegend = document.querySelector("#mapLegend");
+const legendItems = document.querySelector("#legendItems");
 let resultsReturnFocus = null;
+let filterReturnFocus = null;
 
 const map = L.map("map", {
   minZoom: 2,
@@ -151,18 +161,20 @@ function normalizeSearch(value) {
 }
 
 function populateMonthSelect() {
-  monthSelect.innerHTML = "";
+  for (const select of [monthSelect, monthSelectSheet]) {
+    select.innerHTML = "";
 
-  const allOption = document.createElement("option");
-  allOption.value = ALL_MONTH_KEY;
-  allOption.textContent = "All Months";
-  monthSelect.appendChild(allOption);
+    const allOption = document.createElement("option");
+    allOption.value = ALL_MONTH_KEY;
+    allOption.textContent = "Any month";
+    select.appendChild(allOption);
 
-  for (const month of MONTHS) {
-    const option = document.createElement("option");
-    option.value = month.key;
-    option.textContent = month.label;
-    monthSelect.appendChild(option);
+    for (const month of MONTHS) {
+      const option = document.createElement("option");
+      option.value = month.key;
+      option.textContent = month.label;
+      select.appendChild(option);
+    }
   }
 
   syncControls();
@@ -170,21 +182,23 @@ function populateMonthSelect() {
 
 function wireEvents() {
   filterToggle.addEventListener("click", () => {
-    const isOpen = topbar.classList.toggle("filters-open");
-    filterToggle.setAttribute("aria-expanded", String(isOpen));
-    filterToggle.querySelector("span").textContent = isOpen ? "−" : "+";
-    window.setTimeout(() => map.invalidateSize(), 0);
+    setFilterOpen(topControls.hidden, filterToggle);
   });
+
+  filterClose.addEventListener("click", () => setFilterOpen(false));
+  filterDone.addEventListener("click", () => setFilterOpen(false));
 
   resultsToggle.addEventListener("click", () => {
     setResultsOpen(resultsPanel.hidden, resultsToggle);
   });
 
-  mobileResultsToggle.addEventListener("click", () => {
-    setResultsOpen(resultsPanel.hidden, mobileResultsToggle);
-  });
-
   resultsClose.addEventListener("click", () => setResultsOpen(false));
+  panelBackdrop.addEventListener("click", closeOpenPanel);
+
+  legendToggle.addEventListener("click", () => {
+    const isOpen = mapLegend.classList.toggle("legend-open");
+    legendToggle.setAttribute("aria-expanded", String(isOpen));
+  });
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
@@ -194,18 +208,25 @@ function wireEvents() {
       return;
     }
 
-    if (!topbar.classList.contains("filters-open")) return;
-    topbar.classList.remove("filters-open");
-    filterToggle.setAttribute("aria-expanded", "false");
-    filterToggle.querySelector("span").textContent = "+";
-    filterToggle.focus();
-    window.setTimeout(() => map.invalidateSize(), 0);
+    if (!topControls.hidden) {
+      setFilterOpen(false);
+      return;
+    }
+
+    if (mapLegend.classList.contains("legend-open")) {
+      mapLegend.classList.remove("legend-open");
+      legendToggle.setAttribute("aria-expanded", "false");
+      legendToggle.focus();
+    }
   });
 
-  monthSelect.addEventListener("change", (event) => {
-    state.month = event.target.value;
-    render();
-  });
+  for (const select of [monthSelect, monthSelectSheet]) {
+    select.addEventListener("change", (event) => {
+      state.month = event.target.value;
+      syncControls();
+      render();
+    });
+  }
 
   styleSelect.addEventListener("change", (event) => {
     state.style = event.target.value;
@@ -265,6 +286,7 @@ function wireEvents() {
   });
 
   resetFilters.addEventListener("click", resetAllFilters);
+  resetFiltersTop.addEventListener("click", resetAllFilters);
   mapEmptyState.addEventListener("click", (event) => {
     if (event.target.closest("[data-reset-filters]")) resetAllFilters();
   });
@@ -287,10 +309,28 @@ function setPitch(pitch) {
 
 function syncControls() {
   monthSelect.value = state.month;
+  monthSelectSheet.value = state.month;
   styleSelect.value = state.style;
   rockSelect.value = state.rockType;
   destinationSearch.value = state.search;
   syncPitchToggle();
+}
+
+function setFilterOpen(isOpen, trigger = null, moveFocus = true) {
+  if (isOpen && !resultsPanel.hidden) setResultsOpen(false, null, false);
+
+  topControls.hidden = !isOpen;
+  filterToggle.setAttribute("aria-expanded", String(isOpen));
+  filterToggle.querySelector(".filter-toggle-mark").textContent = isOpen ? "−" : "+";
+
+  if (isOpen) {
+    filterReturnFocus = trigger || document.activeElement;
+    if (moveFocus) window.requestAnimationFrame(() => monthSelectSheet.focus());
+  } else if (moveFocus && filterReturnFocus instanceof HTMLElement) {
+    filterReturnFocus.focus();
+  }
+
+  syncOverlayState();
 }
 
 function syncPitchToggle() {
@@ -303,28 +343,31 @@ function syncPitchToggle() {
 }
 
 function setResultsOpen(isOpen, trigger = null, moveFocus = true) {
+  if (isOpen && !topControls.hidden) setFilterOpen(false, null, false);
+
   resultsPanel.hidden = !isOpen;
   resultsToggle.setAttribute("aria-expanded", String(isOpen));
-  mobileResultsToggle.setAttribute("aria-expanded", String(isOpen));
-  setMapInteractive(!isOpen);
 
   if (isOpen) {
     resultsReturnFocus = trigger || document.activeElement;
-
-    if (topbar.classList.contains("filters-open")) {
-      topbar.classList.remove("filters-open");
-      filterToggle.setAttribute("aria-expanded", "false");
-      filterToggle.querySelector("span").textContent = "+";
-      window.setTimeout(() => map.invalidateSize(), 0);
-    }
-
     if (moveFocus) window.requestAnimationFrame(() => destinationSearch.focus());
-    return;
-  }
-
-  if (moveFocus && resultsReturnFocus instanceof HTMLElement) {
+  } else if (moveFocus && resultsReturnFocus instanceof HTMLElement) {
     resultsReturnFocus.focus();
   }
+
+  syncOverlayState();
+}
+
+function closeOpenPanel() {
+  if (!resultsPanel.hidden) setResultsOpen(false);
+  if (!topControls.hidden) setFilterOpen(false);
+}
+
+function syncOverlayState() {
+  const isOpen = !resultsPanel.hidden || !topControls.hidden;
+  panelBackdrop.hidden = !isOpen;
+  document.body.classList.toggle("panel-open", isOpen);
+  setMapInteractive(!isOpen);
 }
 
 function setMapInteractive(isInteractive) {
@@ -473,7 +516,7 @@ function renderResults(destinations) {
     destinationList.innerHTML = `
       <div class="destination-result-empty">
         <strong>No matches yet</strong>
-        <p>Try another search or reset the filters below.</p>
+        <p>Try another search or clear the filters below.</p>
       </div>
     `;
     return;
@@ -511,13 +554,18 @@ function renderResults(destinations) {
 function renderCount(count) {
   const label = countLabel(count);
   destinationCount.textContent = label;
-  mobileDestinationCount.textContent = String(count);
-  resultsToggle.setAttribute("aria-label", `Browse ${label}`);
-  mobileResultsToggle.setAttribute("aria-label", `Browse ${label}`);
+  filterDoneCount.textContent = label;
+  resultsPanelCount.textContent = label;
+  resultsToggle.setAttribute("aria-label", `Open index of ${label}`);
+
+  const activeCount = [state.month !== "all", state.style !== "all", state.rockType !== "all", state.pitch !== "all"]
+    .filter(Boolean).length;
+  filterActiveCount.hidden = activeCount === 0;
+  filterActiveCount.textContent = String(activeCount);
 }
 
 function countLabel(count) {
-  return `${count} destination${count === 1 ? "" : "s"}`;
+  return `${count} area${count === 1 ? "" : "s"}`;
 }
 
 function seasonLabel(destination) {
@@ -544,14 +592,13 @@ function pitchLabel(pitchType) {
 }
 
 function updateLegend(monthSelected) {
-  const legend = document.querySelector("#mapLegend");
   if (monthSelected) {
-    legend.innerHTML = `
+    legendItems.innerHTML = `
       <span><i class="dot legend-peak"></i> Peak</span>
       <span><i class="dot legend-good"></i> Good</span>
     `;
   } else {
-    legend.innerHTML = `
+    legendItems.innerHTML = `
       <span><i class="dot dot-sport"></i> Sport</span>
       <span><i class="dot dot-trad"></i> Trad</span>
       <span><i class="dot dot-boulder"></i> Boulder</span>

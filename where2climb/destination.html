@@ -9,7 +9,7 @@
       name="description"
       content="Season, style, route, and logistics information for a climbing destination on Where2Climb."
     />
-    <meta name="theme-color" content="#0a1022" />
+    <meta name="theme-color" content="#141825" />
     <link id="canonicalLink" rel="canonical" href="https://shinojomoto.com/where2climb/destination.html" />
     <meta property="og:type" content="article" />
     <meta id="ogTitle" property="og:title" content="Climbing Destination Guide | Where2Climb" />
@@ -29,29 +29,38 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260927c" />
+    <link rel="stylesheet" href="./styles.css?v=20260929a" />
   </head>
   <body class="detail-page">
     <main class="detail-shell" id="detailRoot">
       <nav class="detail-site-nav" aria-label="Site">
-        <a href="../index.html">Shino Jomoto</a>
-        <a href="../projects.html">Projects</a>
+        <a class="detail-brand" href="../index.html"><span aria-hidden="true"></span> Shino Jomoto</a>
+        <a href="../projects.html">Projects / 03</a>
       </nav>
-      <a id="backToMap" class="back-link" href="./index.html">Back to map</a>
-      <section class="detail-hero" id="detailHero"></section>
+      <div class="detail-breadcrumb">
+        <a id="backToMap" class="back-link" href="./index.html"><span aria-hidden="true">←</span> World map</a>
+        <span>Seasonal climbing guide</span>
+      </div>
+      <header class="detail-hero" id="detailHero"></header>
       <section class="detail-month" id="detailMonth"></section>
-      <section class="detail-metrics" id="detailMetrics"></section>
-      <section class="detail-all-months" id="detailAllMonths"></section>
-      <section class="detail-sources" id="detailSources"></section>
-      <section class="detail-guide" id="detailGuide"></section>
-      <aside class="detail-planning-note">
-        <strong>Plan with current conditions</strong>
-        <p>Season ratings are trip-planning cues, not weather or access forecasts. Check local conditions and closures before you go.</p>
-      </aside>
+      <div class="detail-content-grid">
+        <div class="detail-story">
+          <section class="detail-all-months" id="detailAllMonths"></section>
+          <section class="detail-sources" id="detailSources"></section>
+        </div>
+        <aside class="detail-sidebar">
+          <section class="detail-metrics" id="detailMetrics"></section>
+          <section class="detail-guide" id="detailGuide"></section>
+          <div class="detail-planning-note">
+            <strong>Check before you go</strong>
+            <p>Season ratings are planning cues, not weather or access forecasts. Confirm current conditions and closures locally.</p>
+          </div>
+        </aside>
+      </div>
     </main>
-    <script type="module" src="./destination.js?v=11"></script>
+    <script type="module" src="./destination.js?v=12"></script>
   </body>
 </html>

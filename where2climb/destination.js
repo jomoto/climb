@@ -129,8 +129,13 @@ if (!destination) {
   function render() {
     const peakSet = new Set(destination.primeMonths);
     const goodSet = new Set(getGoodMonths(destination));
-    const selectedMonthNote =
-      state.month === ALL_MONTH_KEY ? null : destination.monthlyNotes?.[state.month] || null;
+    const cleanedOverview = cleanEditorialText(destination.overview);
+    const cleanedMonthNotes = Object.fromEntries(
+      Object.entries(destination.monthlyNotes || {})
+        .map(([monthKey, note]) => [monthKey, cleanEditorialText(note)])
+        .filter(([, note]) => note && normalizeCopy(note) !== normalizeCopy(cleanedOverview))
+    );
+    const selectedMonthNote = state.month === ALL_MONTH_KEY ? null : cleanedMonthNotes[state.month] || null;
     const selectedMonthStatus =
       state.month === ALL_MONTH_KEY
         ? null
@@ -141,35 +146,44 @@ if (!destination) {
             : "a less ideal month";
     const selectedOverview =
       state.month === ALL_MONTH_KEY
-        ? destination.overview
+        ? cleanedOverview
         : selectedMonthNote ||
           `${MONTH_LABELS[state.month]} is rated as ${selectedMonthStatus} for ${destination.name}. A month-specific write-up has not been added yet; use the season calendar as a planning signal and verify current local conditions.`;
-    const extraNotes = Object.entries(destination.monthlyNotes || {}).filter(
+    const extraNotes = Object.entries(cleanedMonthNotes).filter(
       ([monthKey]) => state.month === ALL_MONTH_KEY || monthKey !== state.month
     );
     const resolvedDestinationStyle = destinationStyle(destination);
+    const location = destinationLocation(destination);
+    const peakMonths = destination.primeMonths.map((month) => MONTH_LABELS[month]).filter(Boolean);
+    const peakMonthLabel = formatList(peakMonths);
 
     detailHero.innerHTML = `
+      <p class="section-index">Climbing area / ${escapeHtml(location)}</p>
       <h1>${escapeHtml(destination.name)}</h1>
-      <p class="detail-subtitle">${escapeHtml(destination.mpAreaTitle)} (${escapeHtml(
-        destinationLocation(destination)
-      )})</p>
-      <div class="chip-row">
-        <span class="chip">${escapeHtml(humanStyle(resolvedDestinationStyle))}</span>
-        <span class="chip">${escapeHtml(destination.rockType || "Unknown")}</span>
-        <span class="chip">${escapeHtml(humanPitch(destination.pitchType))}</span>
+      <p class="detail-lead">${escapeHtml(humanStyle(resolvedDestinationStyle))} on ${escapeHtml(
+        destination.rockType || "unknown rock"
+      )}. Best conditions typically arrive in ${escapeHtml(peakMonthLabel || "the listed peak season")}.</p>
+      <div class="metadata-line" aria-label="Area details">
+        <span>${escapeHtml(location)}</span>
+        <span>${escapeHtml(humanStyle(resolvedDestinationStyle))}</span>
+        <span>${escapeHtml(destination.rockType || "Unknown rock")}</span>
+        <span>${escapeHtml(humanPitch(destination.pitchType))}</span>
       </div>
     `;
 
     detailMonth.innerHTML = `
       <div class="season-head">
-        <h2>Season Calendar</h2>
+        <div>
+          <p class="section-index">01 / Season</p>
+          <h2>Month by month</h2>
+        </div>
+        <p class="season-summary">Peak: ${escapeHtml(peakMonthLabel || "Not listed")}</p>
         <button
           class="season-all-button${state.month === ALL_MONTH_KEY ? " selected" : ""}"
           type="button"
           data-month="all"
           aria-pressed="${state.month === ALL_MONTH_KEY}"
-        >All months</button>
+        >View all months</button>
       </div>
       <div class="season-grid">
         ${MONTHS.map((month) => {
@@ -203,7 +217,8 @@ if (!destination) {
 
     detailMetrics.innerHTML = `
       <article class="stats-card">
-        <h2>Quick Stats</h2>
+        <p class="section-index">02 / Area profile</p>
+        <h2>At a glance</h2>
         <div class="stats-grid">
           <div>
             <h3>Total Routes</h3>
@@ -225,6 +240,7 @@ if (!destination) {
       </article>
       ${routes.length ? `
       <article class="stats-card classic-routes-card">
+        <p class="section-index">03 / Local index</p>
         <h2>${classicLabel}</h2>
         <ul class="classic-routes-list">
           ${routes.map((r) => `
@@ -239,6 +255,7 @@ if (!destination) {
     `;
 
     detailAllMonths.innerHTML = `
+      <p class="section-index">04 / Field guide</p>
       <h2>${
         state.month === ALL_MONTH_KEY
           ? "Overview"
@@ -252,7 +269,8 @@ if (!destination) {
     if (extraNotes.length) {
       detailSources.hidden = false;
       detailSources.innerHTML = `
-        <h2>${state.month === ALL_MONTH_KEY ? "Month Notes" : "Other Month Notes"}</h2>
+        <p class="section-index">05 / Seasonal notes</p>
+        <h2>${state.month === ALL_MONTH_KEY ? "Notes by month" : "Other month notes"}</h2>
         <ul class="source-list">
           ${extraNotes
             .map(
@@ -272,8 +290,9 @@ if (!destination) {
     detailGuide.innerHTML = guideUrl
       ? `
           <div>
-            <h2>Reference Guide</h2>
-            <p>Continue planning with route details, access notes, and community updates.</p>
+            <p class="section-index">External reference</p>
+            <h2>Routes and access</h2>
+            <p>Current route details, access notes, and community updates.</p>
           </div>
           <a class="guide-link" href="${escapeHtml(guideUrl)}" target="_blank" rel="noopener noreferrer">
             View ${escapeHtml(destination.mpAreaTitle || destination.name)} <span aria-hidden="true">↗</span>
@@ -401,6 +420,23 @@ function safeExternalUrl(value) {
   } catch {
     return null;
   }
+}
+
+function cleanEditorialText(value) {
+  return String(value || "")
+    .replace(/^Country and region:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeCopy(value) {
+  return cleanEditorialText(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function formatList(values) {
+  if (values.length < 2) return values[0] || "";
+  if (values.length === 2) return `${values[0]} and ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")}, and ${values.at(-1)}`;
 }
 
 function escapeHtml(value) {
