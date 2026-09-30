@@ -133,7 +133,7 @@ if (!destination) {
     detailHero.innerHTML = `
       <p class="section-index">Climbing area / ${escapeHtml(location)}</p>
       <h1>${escapeHtml(destination.name)}</h1>
-      <p class="detail-lead"><span class="tldr-label">TL;DR</span> ${escapeHtml(tldr)}</p>
+      <p class="detail-lead">${escapeHtml(tldr)}</p>
       <div class="metadata-line" aria-label="Area details">
         <span>${escapeHtml(location)}</span>
         <span>${escapeHtml(resolvedDestinationStyleLabel)}</span>
