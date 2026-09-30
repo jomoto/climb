@@ -130,7 +130,7 @@ if (!destination) {
       <h1>${escapeHtml(destination.name)}</h1>
       <p class="detail-lead">${escapeHtml(resolvedDestinationStyleLabel)} on ${escapeHtml(
         destination.rockType || "unknown rock"
-      )}. Best conditions typically arrive in ${escapeHtml(peakMonthLabel || "the listed peak season")}.</p>
+      )}.</p>
       <div class="metadata-line" aria-label="Area details">
         <span>${escapeHtml(location)}</span>
         <span>${escapeHtml(resolvedDestinationStyleLabel)}</span>
