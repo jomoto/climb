@@ -12,8 +12,9 @@
     />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="styles.css?v=20260813b" />
-    <script defer src="app.js?v=20260813b"></script>
+    <meta name="description" content="Plan your van's power system with scheduled appliances, daily driving and weather scenarios, and an hourly battery reserve simulation." />
+    <link rel="stylesheet" href="styles.css?v=20261003" />
+    <script type="module" src="app.js?v=20261003"></script>
   </head>
   <body>
     <button id="themeToggle" class="theme-toggle" type="button" aria-pressed="false">
@@ -34,8 +35,8 @@
         <p class="kicker">van build tool</p>
         <h1>Vanlife Power Planner</h1>
         <p class="subtitle">
-          Start with your lifestyle and climate. The app estimates daily consumption first,
-          then auto-sizes your key electrical components.
+          Build your energy budget, test your actual components, and see how your battery holds
+          up through a trip. Try cloudy days and nights without driving before choosing equipment.
         </p>
       </header>
 
@@ -54,7 +55,12 @@
               </div>
             </div>
             <p class="section-copy">Select what you use. Sliders represent average daily use.</p>
+            <p id="presetStatus" class="settings-status" aria-live="polite">Weekender starting point.</p>
             <div class="loads-grid" id="loadsGrid"></div>
+            <form id="addLoadForm" class="custom-load-form">
+              <label>Appliance name<input id="customLoadName" maxlength="80" required placeholder="Water pump, CPAP, e-bike…" /></label>
+              <button class="ghost-btn" type="submit">Add appliance</button>
+            </form>
           </section>
 
           <section class="panel-section" data-mobile-step>
@@ -98,7 +104,7 @@
 
                 <div class="solar-precision">
                   <div class="solar-precision-header">
-                    <span>Use live month/location sun model (PVWatts)?</span>
+                    <span>Use historical monthly solar data (PVWatts)?</span>
                     <div class="segmented" id="solarPrecisionToggle">
                       <button id="solarPrecisionYes" type="button" class="seg-btn" data-choice="yes">Yes</button>
                       <button id="solarPrecisionNo" type="button" class="seg-btn active" data-choice="no">No</button>
@@ -131,7 +137,7 @@
                 </div>
 
                 <p class="sun-hours-readout">
-                  Estimated sun hours/day: <strong id="estimatedSunHours">0.0 hr</strong>
+                  Equivalent peak sun-hours/day: <strong id="estimatedSunHours">0.0 hr</strong>
                 </p>
                 <p id="sunHoursSource" class="sun-hours-source">Manual assumption (4.8 sun-hr/day baseline).</p>
               </div>
@@ -147,13 +153,13 @@
               </div>
               <div id="alternatorControls" class="control-stack">
                 <label class="field-row" for="altPower">
-                  <span>Charging power</span>
+                  <span>DC-DC output power</span>
                   <output id="altPowerValue">700 W</output>
                 </label>
                 <input type="range" id="altPower" min="200" max="3000" step="50" value="700" />
 
                 <label class="field-row" for="driveHoursDay">
-                  <span>Drive hours / day</span>
+                  <span>Drive hours each day</span>
                   <output id="driveHoursDayValue">1.0 hr</output>
                 </label>
                 <input type="range" id="driveHoursDay" min="0" max="10" step="0.25" value="1" />
@@ -197,10 +203,10 @@
 
             <div class="control-stack">
               <label class="field-row" for="installedAh">
-                <span>Your planned battery bank</span>
+                <span>Battery bank to test</span>
                 <output id="installedAhValue">400 Ah</output>
               </label>
-              <input type="range" id="installedAh" min="100" max="1800" step="10" value="400" />
+              <input type="range" id="installedAh" min="1" max="1800" step="10" value="400" />
             </div>
 
             <button id="syncInstalled" class="ghost-btn" type="button">Set planned bank to recommendation</button>
@@ -208,26 +214,71 @@
 
           <section class="panel-section" data-mobile-step>
             <button class="mobile-step-toggle" type="button" aria-expanded="true">
-              <span class="mobile-step-number">04</span><span>Assumptions File</span><span class="mobile-step-icon" aria-hidden="true">−</span>
+              <span class="mobile-step-number">04</span><span>Your Trip</span><span class="mobile-step-icon" aria-hidden="true">−</span>
             </button>
-            <h2>Assumptions File</h2>
-            <p class="section-copy">
-              Download a starter settings file (includes all tunable parameters such as
-              <code>halogenWatts = 40</code>, <code>inverterEfficiencyPct = 92</code>,
-              <code>pvWattsApiKey = "DEMO_KEY"</code>), edit it, and import it.
-            </p>
+            <h2>Your Trip</h2>
+            <p class="section-copy">Each day starts at midnight. Driving and shore charging happen only on the days you enter. Solar percentages are stress-test assumptions relative to the selected monthly baseline.</p>
+            <div class="planning-fields">
+              <label>Trip length (days)<input id="tripDays" type="number" min="1" max="30" value="7" /></label>
+              <label>Starting battery charge (%)<input id="startSocPct" type="number" min="0" max="100" value="90" /></label>
+              <label>Minimum reserve (%)<input id="reservePct" type="number" min="0" max="99" value="20" /></label>
+              <label>Daylight window (hours)<input id="daylightHours" type="number" min="1" max="24" step="0.5" value="12" /></label>
+            </div>
+            <div class="button-row trip-scenarios">
+              <button class="ghost-btn compact-btn" id="cloudyScenario" type="button">3 cloudy days, no driving</button>
+              <button class="ghost-btn compact-btn" id="resetSchedule" type="button">Reset daily schedule</button>
+            </div>
+            <div id="tripSchedule" class="schedule-scroll"></div>
+            <details class="advanced-settings">
+              <summary>Battery &amp; charging details</summary>
+              <p class="section-copy">Use your battery and charger specifications. Temperature is the battery's actual temperature, independent of the weather around the fridge. Capacity uses a generic temperature curve; AGM discharge-rate effects and charge taper are not modeled.</p>
+              <div class="planning-fields">
+                <label>Battery temperature (°F)<input id="batteryTempF" type="number" min="-40" max="130" value="77" /></label>
+                <label>Remaining battery health (%)<input id="healthPct" type="number" min="10" max="100" value="100" /></label>
+                <label>Battery nominal voltage (V)<input id="nominalVoltage" type="number" min="1" max="60" step="0.1" value="12.8" /></label>
+                <label>Charging voltage (V)<input id="chargeVoltage" type="number" min="1" max="60" step="0.1" value="14.2" /></label>
+                <label>Maximum battery charge (A)<input id="maxChargeAmps" type="number" min="0" max="1000" value="100" /></label>
+                <label>Battery/BMS discharge limit (A)<input id="maxDischargeAmps" type="number" min="0" max="2000" value="200" /></label>
+                <label>Lithium charge cutoff (°F)<input id="chargeCutoffF" type="number" min="-40" max="130" value="41" /></label>
+                <label>Inverter on from midnight (hours)<input id="inverterOnHours" type="number" min="0" max="24" step="0.5" value="0" /></label>
+                <label>Shore charger output (A)<input id="shoreAmps" type="number" min="0" max="200" value="20" /></label>
+                <label>Solar space limit (W)<input id="roofSolarMax" type="number" min="0" max="20000" value="800" /></label>
+              </div>
+              <p class="section-copy">Inverter standby also follows scheduled AC use. Enter 24 to leave it on all day. Solar space limit is a planning constraint; verify panel dimensions and roof obstructions.</p>
+            </details>
+          </section>
+
+          <section class="panel-section" data-mobile-step>
+            <button class="mobile-step-toggle" type="button" aria-expanded="true">
+              <span class="mobile-step-number">05</span><span>Save &amp; Share</span><span class="mobile-step-icon" aria-hidden="true">−</span>
+            </button>
+            <h2>Save &amp; Share</h2>
+            <p class="section-copy">Your plan saves automatically in this browser. Export or share the complete plan, including custom appliances and daily schedules. API keys are excluded.</p>
 
             <div class="button-row">
-              <button id="downloadSettings" class="ghost-btn" type="button">Download Starter Settings</button>
-              <label class="file-input" for="uploadSettings">Import Settings JSON</label>
+              <button id="downloadSettings" class="ghost-btn" type="button">Export plan</button>
+              <label class="file-input" for="uploadSettings" tabindex="0" role="button">Import plan</label>
               <input id="uploadSettings" type="file" accept="application/json" />
+              <button id="sharePlan" class="ghost-btn" type="button">Copy share link</button>
+              <button id="printPlan" class="ghost-btn" type="button">Print report</button>
             </div>
-            <p id="settingsStatus" class="settings-status">No settings imported yet.</p>
+            <input id="shareLink" class="hidden" readonly aria-label="Shareable plan URL" />
+            <p id="settingsStatus" class="settings-status" role="status">Plan saves in this browser.</p>
           </section>
         </section>
 
         <aside class="panel results-panel" id="results">
-          <h2>Estimated Daily Consumption</h2>
+          <h2>Your Power Plan</h2>
+          <p id="dataQuality" class="data-quality"></p>
+
+          <section class="trip-result" aria-labelledby="tripResultTitle">
+            <h3 id="tripResultTitle">Trip result</h3>
+            <p id="tripVerdict" role="status"></p>
+            <p id="tripAdvice"></p>
+            <svg id="batteryChart" viewBox="0 0 560 190" role="img" aria-label="Hourly battery charge during your trip"></svg>
+            <p id="chartSummary" class="assumption-note"></p>
+            <details><summary>Daily energy and battery charge</summary><div id="dailyResults" class="schedule-scroll"></div></details>
+          </section>
 
           <section class="consumption-hero">
             <p>Likely Daily Energy Usage</p>
@@ -238,11 +289,11 @@
 
           <div class="stat-grid">
             <article class="stat-card">
-              <p>Daily recharge</p>
+              <p>Avg. available recharge</p>
               <h3 id="dailyRecharge">0 Wh</h3>
             </article>
             <article class="stat-card">
-              <p>Net from battery</p>
+              <p>Avg. energy balance</p>
               <h3 id="netFromBattery">0 Wh</h3>
             </article>
             <article class="stat-card">
@@ -253,25 +304,26 @@
 
           <div class="recommend-grid">
             <article class="recommend-card">
-              <p>Battery target (no recharge reserve)</p>
+              <p>Minimum bank: reserve days, no recharge</p>
               <h3 id="recNoChargeAh">0 Ah</h3>
               <span id="recNoChargeWh">0 Wh total</span>
             </article>
             <article class="recommend-card">
-              <p>Battery target (with recharge assumptions)</p>
+              <p>Minimum bank: this trip's schedule</p>
               <h3 id="recRechargeAh">0 Ah</h3>
               <span id="recRechargeWh">0 Wh total</span>
             </article>
           </div>
 
           <section class="components-card">
-            <h3>Main Components (Auto or Manual)</h3>
+            <h3>Components being tested</h3>
+            <p class="assumption-note">Input setup uses the battery, solar, and DC-DC values you entered. Custom components override those values throughout the simulation.</p>
             <div class="components-toolbar">
               <div class="segmented" id="componentModeToggle">
-                <button type="button" class="seg-btn active" data-mode="auto">Automatic</button>
-                <button type="button" class="seg-btn" data-mode="manual">Manual</button>
+                <button type="button" class="seg-btn active" data-mode="auto">Input setup</button>
+                <button type="button" class="seg-btn" data-mode="manual">Custom components</button>
               </div>
-              <button id="clearManualComponents" class="ghost-btn compact-btn" type="button">Clear Manual</button>
+              <button id="clearManualComponents" class="ghost-btn compact-btn" type="button">Clear overrides</button>
             </div>
             <div id="manualComponentControls" class="manual-controls hidden">
               <label class="select-field" for="manualBatteryAh">
@@ -333,6 +385,12 @@
             </div>
           </section>
 
+          <section class="components-card">
+            <h3>Suggested changes</h3>
+            <p id="suggestedSystem" class="assumption-note"></p>
+            <button id="applySuggested" class="ghost-btn" type="button">Apply suggested sizes</button>
+          </section>
+
           <section class="runway-card">
             <h3>Battery Runway</h3>
             <div class="runway-metrics">
@@ -341,7 +399,7 @@
                 <strong id="runtimeNoCharge">0 days</strong>
               </div>
               <div>
-                <p>With recharge</p>
+                <p>Trip reserve reached</p>
                 <strong id="runtimeWithRecharge">0 days</strong>
               </div>
             </div>
@@ -360,9 +418,10 @@
             and charger/inverter behavior.
           </p>
           <p class="sizing-footnote">
-            Components are auto-sized for typical conditions. Extreme summer heat or winter cold
-            may require significantly larger panels and batteries than the baseline recommendation.
-            Use the month and location tools to model your worst-case season.
+            Hourly planning estimate with average power within each hour and a smooth daylight solar curve.
+            Weather percentages are scenarios, not forecasts or probabilities. Battery sizing assumes
+            the entered charge-current limit remains available. Confirm surge ratings, panel voltage,
+            alternator compatibility, wiring, and manufacturer charging limits before buying components.
           </p>
         </aside>
       </div>

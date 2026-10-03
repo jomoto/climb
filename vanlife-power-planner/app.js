@@ -1,10 +1,12 @@
+import { pickSize, temperatureCapacity, buildLoadProfile, simulateTrip, sizeBatteryForTrip, validateSettings } from './model.js';
+
 const DEVICE_LIBRARY = [
   {
     id: "fridge",
     name: "12V Fridge",
     watts: 45,
     dutyFactor: 0.26,
-    note: "Compressor cycling phase. Override via settings fridgeDutyFactor.",
+    note: "Compressor running power. Temperature estimates cycling; measured daily energy can override it.",
     fixedDailyHours: 24,
     maxHours: 24,
     step: 0.5,
@@ -155,6 +157,15 @@ const DEFAULT_COMPONENT_TIERS = {
   inverterWatts: [600, 1000, 1200, 1500, 2000, 2500, 3000, 4000]
 };
 const THEME_STORAGE_KEY = "vanlife-power-theme";
+const PLAN_STORAGE_KEY = "vanlife-power-plan-v2";
+const BUILTIN_IDS = new Set(DEVICE_LIBRARY.map(device => device.id));
+const LOAD_DEFAULTS = {
+  fridge: { startHour: 0, powerPath: 'dc' }, lights: { startHour: 18, powerPath: 'dc' },
+  induction: { startHour: 18, powerPath: 'ac' }, starlink: { startHour: 9, powerPath: 'ac' },
+  ac: { startHour: 21, powerPath: 'ac' }, fan: { startHour: 18, powerPath: 'dc' },
+  phones: { startHour: 18, powerPath: 'usb' }, laptop: { startHour: 9, powerPath: 'ac' },
+  heaterFan: { startHour: 22, powerPath: 'dc' }
+};
 
 const PRESETS = {
   weekender: {
@@ -405,6 +416,12 @@ const state = {
   },
   activePreset: "weekender"
 };
+state.trip = {
+  days: 7, startSocPct: 90, reservePct: 20, batteryTempF: 77, healthPct: 100,
+  nominalVoltage: 12.8, chargeVoltage: 14.2, maxChargeAmps: 100, maxDischargeAmps: 200,
+  chargeCutoffF: 41, daylightHours: 12, inverterOnHours: 0, shoreAmps: 20,
+  roofSolarMax: 800, schedule: []
+};
 
 const loadUiMap = new Map();
 const uiSetters = {};
@@ -430,6 +447,13 @@ let fridgeClimateRequestNonce = 0;
 let fridgeClimateDebounceTimer = null;
 let fridgeClimateLastRequestAt = 0;
 const fridgeClimateCache = new Map();
+let initializing = true;
+let applyingPreset = false;
+let lastPlan = null;
+let savedPlanTimer = null;
+let mapReturnFocus = null;
+let presetSignature = '';
+const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
 function byId(id) {
   return document.getElementById(id);
@@ -485,17 +509,7 @@ function roundToStep(value, step) {
 }
 
 function pickTier(value, tiers) {
-  if (value <= 0) {
-    return 0;
-  }
-
-  for (const tier of tiers) {
-    if (value <= tier) {
-      return tier;
-    }
-  }
-
-  return tiers[tiers.length - 1] || value;
+  return pickSize(value, tiers).value;
 }
 
 function toPositiveNumber(value, fallback) {
@@ -516,13 +530,13 @@ function formatEnergy(wh) {
 }
 
 function formatAh(ah) {
-  const rounded = Math.max(0, roundToStep(ah, 10));
+  const rounded = Math.max(0, Math.ceil(ah / 10) * 10);
   return `${rounded.toFixed(0)} Ah`;
 }
 
 function formatDays(days) {
   if (!Number.isFinite(days)) {
-    return "Continuous";
+    return "No consumption";
   }
 
   if (days >= 30) {
@@ -576,6 +590,7 @@ function getDeviceWatts(device, loadConfig) {
 }
 
 function getDeviceDutyFactor(device) {
+  if (state.loads[device.id]?.customDutyFactor != null) return state.loads[device.id].customDutyFactor;
   if (device.id === "fridge") {
     return state.assumptions.fridgeDutyFactor;
   }
@@ -583,32 +598,18 @@ function getDeviceDutyFactor(device) {
   return device.dutyFactor;
 }
 
-function batteryTempDeratingFactor(tempF, chemistry) {
-  // Batteries lose capacity in cold weather. LiFePO4 is most affected;
-  // AGM/lead-acid derates somewhat; NMC derates moderately.
-  // Returns a multiplier (0.0 - 1.0) on usable capacity.
-  // At 77F+: no derating. Below 32F: significant derating.
-  const tempC = ((tempF - 32) * 5) / 9;
-  if (tempC >= 25) return 1.0;
+function batteryTempDeratingFactor(tempF) {
+  return temperatureCapacity(tempF);
+}
 
-  if (chemistry === "lifepo4") {
-    // LiFePO4 loses ~20% at 0C, ~40% at -10C, cannot charge below 0C
-    if (tempC <= -20) return 0.45;
-    if (tempC <= 0) return clamp(0.6 + (tempC / 20) * 0.15, 0.45, 0.8);
-    return clamp(0.8 + ((tempC) / 25) * 0.2, 0.6, 1.0);
+async function fetchWithTimeout(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
   }
-
-  if (chemistry === "agm") {
-    // AGM/lead-acid: slower but still impacted
-    if (tempC <= -20) return 0.5;
-    if (tempC <= 0) return clamp(0.65 + (tempC / 20) * 0.15, 0.5, 0.85);
-    return clamp(0.85 + ((tempC) / 25) * 0.15, 0.65, 1.0);
-  }
-
-  // NMC lithium: moderate cold sensitivity
-  if (tempC <= -20) return 0.5;
-  if (tempC <= 0) return clamp(0.65 + (tempC / 20) * 0.15, 0.5, 0.85);
-  return clamp(0.85 + ((tempC) / 25) * 0.15, 0.65, 1.0);
 }
 
 function fahrenheitToCelsius(tempF) {
@@ -726,6 +727,8 @@ function mapSelectionSummary(context = "fridge") {
 
 function resetFridgeClimateState() {
   cancelFridgeClimateResolve();
+  fridgeClimateRequestNonce += 1;
+  fridgeElevationRequestNonce += 1;
   fridgeClimateStatus = "idle";
   fridgeClimateError = "";
   fridgeClimateNightTempF = null;
@@ -752,8 +755,7 @@ function sleep(ms) {
 }
 
 function buildFridgeClimateCacheKey(lat, lon, month, startYear, endYear) {
-  const monthNumber = clamp(Number(month), 1, 12);
-  return `${lat.toFixed(3)},${lon.toFixed(3)}|m${monthNumber}|${startYear}-${endYear}`;
+  return `${lat.toFixed(3)},${lon.toFixed(3)}|${startYear}-${endYear}`;
 }
 
 function parseFridgeClimatePayload(payload, month, startYear, endYear) {
@@ -777,6 +779,7 @@ function parseFridgeClimatePayload(payload, month, startYear, endYear) {
       continue;
     }
 
+    if (highs[i] == null || lows[i] == null) continue;
     const high = Number(highs[i]);
     const low = Number(lows[i]);
     if (!Number.isFinite(high) || !Number.isFinite(low)) {
@@ -825,7 +828,7 @@ async function fetchFridgeMonthlyClimateAverages(lat, lon, month) {
   const cacheKey = buildFridgeClimateCacheKey(lat, lon, month, startYear, endYear);
   const cached = fridgeClimateCache.get(cacheKey);
   if (cached) {
-    return cached;
+    return parseFridgeClimatePayload(cached, month, startYear, endYear);
   }
 
   const minIntervalMs = 1100;
@@ -842,11 +845,11 @@ async function fetchFridgeMonthlyClimateAverages(lat, lon, month) {
     });
 
     fridgeClimateLastRequestAt = Date.now();
-    const response = await fetch(`${baseUrl}?${params.toString()}`);
+    const response = await fetchWithTimeout(`${baseUrl}?${params.toString()}`);
     if (response.ok) {
       const payload = await response.json();
       const parsed = parseFridgeClimatePayload(payload, month, startYear, endYear);
-      fridgeClimateCache.set(cacheKey, parsed);
+      fridgeClimateCache.set(cacheKey, payload);
       return parsed;
     }
 
@@ -923,7 +926,7 @@ async function fetchElevationFeet(lat, lon) {
     latitude: lat.toFixed(6),
     longitude: lon.toFixed(6)
   });
-  const response = await fetch(`https://api.open-meteo.com/v1/elevation?${params.toString()}`);
+  const response = await fetchWithTimeout(`https://api.open-meteo.com/v1/elevation?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
   }
@@ -974,25 +977,9 @@ async function resolveFridgeElevationFromPin(lat, lon) {
   calculate();
 }
 
-function alternatorEffectiveHours(driveHours) {
-  // Returns taper-adjusted equivalent full-power hours for a given drive
-  // duration. DC-DC chargers deliver full bulk power for the first hour,
-  // then taper to ~60% as the battery fills into absorption/float.
-  const bulkHours = 1.0;
-  const taperFactor = 0.6;
-  if (driveHours <= bulkHours) {
-    return driveHours;
-  }
-  return bulkHours + (driveHours - bulkHours) * taperFactor;
-}
-
-function alternatorEffectiveWh(powerWatts, driveHours, efficiencyFactor) {
-  return powerWatts * alternatorEffectiveHours(driveHours) * efficiencyFactor;
-}
-
 function getSolarSunHoursModel() {
-  const exposure = state.assumptions.exposureMultipliers[state.solar.exposure] || 1;
-  const manualBase = state.assumptions.baseSunHours || 4.8;
+  const exposure = state.assumptions.exposureMultipliers[state.solar.exposure] ?? 1;
+  const manualBase = state.assumptions.baseSunHours ?? 4.8;
   const precision = state.solarPrecision;
   let baseHours = manualBase;
   let usingPvWatts = false;
@@ -1001,7 +988,7 @@ function getSolarSunHoursModel() {
   if (precision.enabled && precision.hasPinned && Array.isArray(precision.monthlySunHours)) {
     const month = clamp(Number(precision.month), 1, 12);
     const monthlyValue = Number(precision.monthlySunHours[month - 1]);
-    if (Number.isFinite(monthlyValue) && monthlyValue > 0) {
+    if (Number.isFinite(monthlyValue) && monthlyValue >= 0) {
       baseHours = monthlyValue;
       usingPvWatts = true;
       if (exposure < 1) {
@@ -1041,7 +1028,7 @@ async function fetchPvWattsMonthlySunHours(lat, lon) {
     radius: "100"
   });
 
-  const response = await fetch(`https://developer.nrel.gov/api/pvwatts/v8.json?${params.toString()}`);
+  const response = await fetchWithTimeout(`https://developer.nlr.gov/api/pvwatts/v8.json?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
   }
@@ -1057,6 +1044,7 @@ async function fetchPvWattsMonthlySunHours(lat, lon) {
     throw new Error("No monthly solar data returned.");
   }
 
+  if (values.some(value => value == null)) throw new Error("Solar data contains missing months.");
   const sanitized = values.map((value) => Number(value));
   if (sanitized.some((value) => !Number.isFinite(value) || value < 0)) {
     throw new Error("PVWatts data was invalid.");
@@ -1082,6 +1070,8 @@ function refreshSolarPrecisionUi() {
 
   yes.classList.toggle("active", precision.enabled);
   no.classList.toggle("active", !precision.enabled);
+  yes.setAttribute("aria-pressed", String(precision.enabled));
+  no.setAttribute("aria-pressed", String(!precision.enabled));
   yes.disabled = !enabled;
   no.disabled = !enabled;
 
@@ -1194,7 +1184,8 @@ function initStateFromLibrary() {
       enabled: device.defaultOn,
       hours: device.fixedDailyHours || device.defaultHours,
       lightType: device.supportsLightType ? "led" : null,
-      customWatts: null
+      customWatts: null, customDutyFactor: null, quantity: 1, measuredWh: null, surgeWatts: device.watts,
+      ...LOAD_DEFAULTS[device.id]
     };
   });
 }
@@ -1206,19 +1197,19 @@ function createLoadCard(device) {
 
   card.innerHTML = `
     <div class="load-title">
-      <h3>${device.name}</h3>
-      <span class="watt-pill" data-watts>${device.watts}W</span>
-      <input class="watt-edit" data-watt-edit type="number" min="1" max="5000" step="1" value="${device.watts}" />
+      <h3>${escapeHtml(device.name)}</h3>
+      <button type="button" class="watt-pill" data-watts aria-label="Edit ${escapeHtml(device.name)} watts">${device.watts}W ✎</button>
+      <input class="watt-edit" data-watt-edit type="number" min="0" max="20000" step="1" value="${device.watts}" aria-label="${escapeHtml(device.name)} operating watts" />
     </div>
     <p class="load-note">
-      ${device.note}
+      ${escapeHtml(device.note)}
       ${
         device.id === "fridge"
           ? " Set the ambient temperature where you'll be parked to model compressor load."
           : ""
       }
     </p>
-    <div class="segmented">
+    <div class="segmented" aria-label="${escapeHtml(device.name)} enabled">
       <button type="button" class="seg-btn" data-toggle="yes">Yes</button>
       <button type="button" class="seg-btn" data-toggle="no">No</button>
     </div>
@@ -1263,13 +1254,13 @@ function createLoadCard(device) {
           <strong data-fridge-duty>${(computeFridgeThermalModel().dailyDuty * 100).toFixed(0)}%</strong>
         </p>
         <p class="fridge-insight">
-          Estimated fridge draw:
+          Fridge draw per device:
           <strong data-fridge-draw>${formatEnergy(computeFridgeThermalModel().dailyWh)}/day</strong>
         </p>
         <p class="fridge-insight" data-fridge-source>Manual daytime temperature mode.</p>
         <div class="fridge-precision">
           <div class="fridge-precision-header">
-            <span>Want to be precise on likely fridge draw?</span>
+            <span>Use historical climate for fridge cycling?</span>
             <div class="segmented" data-fridge-precision-toggle>
               <button type="button" class="seg-btn" data-fridge-precision="yes">Yes</button>
               <button type="button" class="seg-btn" data-fridge-precision="no">No</button>
@@ -1282,6 +1273,7 @@ function createLoadCard(device) {
                 ${MONTH_OPTIONS.map((option) => `<option value="${option.value}">${option.label}</option>`).join("")}
               </select>
             </label>
+            <button type="button" class="ghost-btn compact-btn" data-change-location>Change location</button>
             <p class="fridge-insight" data-fridge-pin-summary>${mapSelectionSummary()}</p>
           </div>
         </div>
@@ -1296,7 +1288,8 @@ function createLoadCard(device) {
         data-load-hours
         type="range"
         min="${device.minHours || 0}"
-        max="${device.maxHours}"
+        max="24"
+        aria-label="${escapeHtml(device.name)} hours per day"
         step="${device.step}"
         value="${device.defaultHours}"
       />
@@ -1351,13 +1344,13 @@ function createLoadCard(device) {
 
     const commitWattEdit = () => {
       const raw = parseInt(wattEdit.value, 10);
-      if (Number.isFinite(raw) && raw > 0 && raw <= 5000) {
+      if (Number.isFinite(raw) && raw >= 0 && raw <= 20000) {
         const defaultWatts = device.id === "lights"
           ? (state.loads[device.id].lightType === "halogen" ? state.assumptions.halogenWatts : state.assumptions.ledWatts)
           : device.watts;
         state.loads[device.id].customWatts = raw === defaultWatts ? null : raw;
       } else {
-        state.loads[device.id].customWatts = null;
+        wattEdit.value = String(getDeviceWatts(device, state.loads[device.id]));
       }
       wattEdit.classList.remove("visible");
       wattsPill.classList.remove("hidden");
@@ -1374,7 +1367,6 @@ function createLoadCard(device) {
       if (e.key === "Escape") {
         const watts = getDeviceWatts(device, state.loads[device.id]);
         wattEdit.value = String(Math.round(watts));
-        state.loads[device.id].customWatts = null;
         wattEdit.classList.remove("visible");
         wattsPill.classList.remove("hidden");
         updateLoadCard(device.id);
@@ -1389,6 +1381,7 @@ function createLoadCard(device) {
       if (output) {
         output.textContent = `${state.loads[device.id].hours.toFixed(1)} hr/day`;
       }
+      refreshLoadDetails(device);
       calculate();
     });
   }
@@ -1483,6 +1476,7 @@ function createLoadCard(device) {
     fridgePinSummary
   });
 
+  addLoadDetails(card, device);
   updateLoadCard(device.id);
   return card;
 }
@@ -1501,6 +1495,8 @@ function updateLoadCard(deviceId) {
   ui.card.classList.toggle("disabled", !config.enabled);
   ui.yesButton.classList.toggle("active", config.enabled);
   ui.noButton.classList.toggle("active", !config.enabled);
+  ui.yesButton.setAttribute("aria-pressed", String(config.enabled));
+  ui.noButton.setAttribute("aria-pressed", String(!config.enabled));
   if (ui.slider) {
     ui.slider.disabled = !config.enabled;
   }
@@ -1508,9 +1504,9 @@ function updateLoadCard(deviceId) {
     ui.output.textContent = `${config.hours.toFixed(1)} hr/day`;
   }
   const isCustom = config.customWatts !== null && config.customWatts !== undefined;
-  ui.wattsPill.textContent = `${Math.round(watts)}W`;
+  ui.wattsPill.textContent = `${Math.round(watts)}W ✎`;
   ui.wattsPill.classList.toggle("custom", isCustom);
-  ui.wattsPill.title = isCustom ? "Custom wattage (click to edit, Esc to reset)" : "Click to customize wattage";
+  ui.wattsPill.title = isCustom ? "Custom wattage (click to edit, Esc to cancel)" : "Click to customize wattage";
   if (ui.wattEdit) {
     ui.wattEdit.value = String(Math.round(watts));
   }
@@ -1518,6 +1514,7 @@ function updateLoadCard(deviceId) {
   if (ui.lightButtons.length > 0) {
     ui.lightButtons.forEach((button) => {
       button.classList.toggle("active", button.dataset.lightType === config.lightType);
+      button.setAttribute("aria-pressed", String(button.dataset.lightType === config.lightType));
     });
   }
 
@@ -1540,7 +1537,7 @@ function updateLoadCard(deviceId) {
       ui.fridgeDuty.textContent = `${(fridgeModel.dailyDuty * 100).toFixed(0)}%`;
     }
     if (ui.fridgeDraw && fridgeModel) {
-      ui.fridgeDraw.textContent = `${formatEnergy(fridgeModel.dailyWh)}/day`;
+      ui.fridgeDraw.textContent = `${formatEnergy(config.measuredWh ?? fridgeModel.dailyWh)}/day`;
     }
     if (ui.fridgeSource) {
       if (!config.enabled) {
@@ -1576,6 +1573,7 @@ function updateLoadCard(deviceId) {
       ui.fridgePrecisionButtons.forEach((button) => {
         const isYes = button.dataset.fridgePrecision === "yes";
         button.disabled = !config.enabled;
+        button.setAttribute("aria-pressed", String(state.fridgePrecision.enabled === isYes));
         button.classList.toggle(
           "active",
           (state.fridgePrecision.enabled && isYes) || (!state.fridgePrecision.enabled && !isYes)
@@ -1595,6 +1593,7 @@ function updateLoadCard(deviceId) {
     updateMapSelectionLabel();
   }
 
+  refreshLoadDetails(device);
   scheduleLoadGridLayout();
 }
 
@@ -1654,6 +1653,8 @@ function wireBooleanToggle(containerId, initialValue, onChange) {
   const setValue = (value, silent = false) => {
     yesButton.classList.toggle("active", value);
     noButton.classList.toggle("active", !value);
+    yesButton.setAttribute("aria-pressed", String(value));
+    noButton.setAttribute("aria-pressed", String(!value));
 
     if (!silent) {
       onChange(value);
@@ -1675,6 +1676,7 @@ function wireChoiceToggle(containerId, attrName, initialValue, onChange) {
   const setValue = (value, silent = false) => {
     buttons.forEach((button) => {
       button.classList.toggle("active", button.getAttribute(attrName) === value);
+      button.setAttribute("aria-pressed", String(button.getAttribute(attrName) === value));
     });
 
     if (!silent) {
@@ -1695,14 +1697,27 @@ function wireRange(inputId, outputId, formatter, onChange) {
   const input = byId(inputId);
   const output = byId(outputId);
 
+  const number = document.createElement('input');
+  number.type = 'number'; number.required = true; number.className = 'exact-input'; number.min = input.min;
+  number.max = ['installedAh', 'solarWatts', 'altPower'].includes(inputId) ? '20000' : inputId === 'driveHoursDay' ? '24' : input.max;
+  number.step = 'any'; number.id = `${inputId}Exact`;
+  const label = document.querySelector(`label[for="${inputId}"]`);
+  number.setAttribute('aria-label', `${label?.querySelector('span')?.textContent ?? inputId} exact value`);
+  input.after(number);
   const setValue = (value) => {
-    input.value = String(value);
+    input.max = String(Math.max(Number(input.max), value));
+    input.step = 'any'; input.value = String(value); number.value = String(value);
     output.textContent = formatter(value);
   };
+  number.addEventListener('input', () => {
+    if (!number.checkValidity() || number.value === '') return;
+    const value = Number(number.value); setValue(value); onChange(value); calculate();
+  });
 
   input.addEventListener("input", () => {
     const value = parseFloat(input.value);
     onChange(value);
+    number.value = String(value);
     output.textContent = formatter(value);
     calculate();
   });
@@ -1742,6 +1757,7 @@ function wireSolarPrecisionControls() {
 
   no.addEventListener("click", () => {
     state.solarPrecision.enabled = false;
+    solarRequestNonce += 1;
     state.solarPrecision.status = "idle";
     state.solarPrecision.error = "";
     refreshSolarPrecisionUi();
@@ -1780,7 +1796,7 @@ function updateMapSelectionLabel() {
   } else {
     title.textContent = "Pin Your Likely Camp Spot";
     copy.textContent =
-      "Pick your month in the fridge card, then click where you will spend most time. This helps estimate likely fridge draw more accurately than city-level assumptions.";
+      "Pick your month in the fridge card, then click where you will spend most time. This provides regional historical climate, not campsite or van-interior measurements.";
   }
 }
 
@@ -1845,10 +1861,12 @@ function openMapModal(context = "fridge") {
   }
 
   activeMapContext = context === "solar" ? "solar" : "fridge";
+  mapReturnFocus = document.activeElement;
   modal.classList.remove("hidden");
   modal.setAttribute("aria-hidden", "false");
   initPrecisionMap();
   updateMapSelectionLabel();
+  byId('closeMapModal').focus();
 
   const activeState = activeMapContext === "solar" ? state.solarPrecision : state.fridgePrecision;
 
@@ -1878,6 +1896,7 @@ function closeMapModal() {
 
   modal.classList.add("hidden");
   modal.setAttribute("aria-hidden", "true");
+  mapReturnFocus?.focus();
 }
 
 function wireMapModal() {
@@ -1885,6 +1904,17 @@ function wireMapModal() {
   byId("mapModal").addEventListener("click", (event) => {
     if (event.target.id === "mapModal") {
       closeMapModal();
+    }
+  });
+  document.addEventListener('keydown', event => {
+    const modal = byId('mapModal');
+    if (modal.classList.contains('hidden')) return;
+    if (event.key === 'Escape') { event.preventDefault(); closeMapModal(); }
+    if (event.key === 'Tab') {
+      const focusable = [...modal.querySelectorAll('button, a[href], input, select, [tabindex="0"]')].filter(element => !element.disabled);
+      const first = focusable[0]; const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
   });
 }
@@ -1906,10 +1936,10 @@ function buildManualSelectOptions() {
       return;
     }
 
-    const currentSelection = state.manualComponents[config.key] || "auto";
+    const currentSelection = state.manualComponents[config.key] ?? "auto";
     const tiers = state.componentTiers[config.tierKey] || [];
 
-    const options = ['<option value="auto">Auto</option>'];
+    const options = ['<option value="auto">Use input / sized value</option>'];
 
     if (config.includeZero) {
       options.push('<option value="0">None</option>');
@@ -1919,6 +1949,9 @@ function buildManualSelectOptions() {
       options.push(`<option value="${tier}">${tier} ${config.unit}</option>`);
     });
 
+    if (currentSelection !== 'auto' && !tiers.includes(Number(currentSelection)) && Number(currentSelection) >= 0) {
+      options.push(`<option value="${Number(currentSelection)}">${Number(currentSelection)} ${config.unit} (custom)</option>`);
+    }
     select.innerHTML = options.join("");
     if (select.querySelector(`option[value="${currentSelection}"]`)) {
       select.value = currentSelection;
@@ -1961,7 +1994,7 @@ function wireComponentModeToggle() {
 
   const setMode = (mode, silent = false) => {
     state.componentMode = mode;
-    buttons.forEach((button) => button.classList.toggle("active", button.dataset.mode === mode));
+    buttons.forEach((button) => { button.classList.toggle("active", button.dataset.mode === mode); button.setAttribute("aria-pressed", String(button.dataset.mode === mode)); });
     refreshComponentModeVisibility();
 
     if (!silent) {
@@ -1980,16 +2013,6 @@ function wireComponentModeToggle() {
 
   setMode(state.componentMode, true);
   return (mode) => setMode(mode, true);
-}
-
-function setModePill(id, manual) {
-  const pill = byId(id);
-  if (!pill) {
-    return;
-  }
-
-  pill.textContent = manual ? "Manual" : "Auto";
-  pill.classList.toggle("manual", manual);
 }
 
 function resolveComponentValue(key, autoValue) {
@@ -2021,10 +2044,14 @@ function sanitizeTierArray(value, fallback) {
 
 function buildSettingsPayload() {
   return {
-    version: 1,
-    assumptions: cloneValue(state.assumptions),
+    version: 2,
+    componentMode: state.componentMode,
+    manualComponents: Object.fromEntries(Object.entries(state.manualComponents).map(([key, value]) => [key, value === "auto" ? value : Number(value)])),
+    assumptions: { ...cloneValue(state.assumptions), pvWattsApiKey: "DEMO_KEY" },
     componentTiers: cloneValue(state.componentTiers),
     defaults: {
+      trip: cloneValue(state.trip),
+      customLoads: DEVICE_LIBRARY.filter(device => !BUILTIN_IDS.has(device.id)).map(device => ({ ...cloneValue(state.loads[device.id]), id: device.id, name: device.name, watts: device.watts })),
       solar: {
         ...cloneValue(state.solar),
         precision: cloneValue({
@@ -2047,11 +2074,8 @@ function buildSettingsPayload() {
         voltage: state.voltage,
         installedAh: state.installedAh
       },
-      loads: DEVICE_LIBRARY.reduce((acc, device) => {
-        acc[device.id] =
-          device.id === "fridge"
-            ? { enabled: state.loads[device.id].enabled }
-            : cloneValue(state.loads[device.id]);
+      loads: DEVICE_LIBRARY.filter(device => BUILTIN_IDS.has(device.id)).reduce((acc, device) => {
+        acc[device.id] = cloneValue(state.loads[device.id]);
         return acc;
       }, {})
     },
@@ -2076,131 +2100,27 @@ function downloadSettingsFile() {
   link.remove();
   URL.revokeObjectURL(url);
 
-  byId("settingsStatus").textContent = "Starter settings file downloaded.";
+  byId("settingsStatus").textContent = "Complete plan exported. API keys excluded.";
 }
 
 function applySettingsFromPayload(payload) {
-  if (!payload || typeof payload !== "object") {
-    throw new Error("Settings file is not a JSON object.");
-  }
+  validateSettings(payload);
+  solarRequestNonce += 1;
+  resetFridgeClimateState();
 
-  if (payload.assumptions && typeof payload.assumptions === "object") {
-    const assumptions = payload.assumptions;
-    const previousFridgeClimateLookbackYears = state.assumptions.fridgeClimateLookbackYears;
-
-    state.assumptions.temperatureBaselineF = clamp(
-      toPositiveNumber(assumptions.temperatureBaselineF, state.assumptions.temperatureBaselineF),
-      0,
-      120
-    );
-
-    state.assumptions.panelSystemEfficiencyPct = clamp(
-      toPositiveNumber(assumptions.panelSystemEfficiencyPct, state.assumptions.panelSystemEfficiencyPct),
-      40,
-      99
-    );
-
-    state.assumptions.alternatorEfficiencyPct = clamp(
-      toPositiveNumber(assumptions.alternatorEfficiencyPct, state.assumptions.alternatorEfficiencyPct),
-      40,
-      99
-    );
-
-    state.assumptions.inverterEfficiencyPct = clamp(
-      toPositiveNumber(assumptions.inverterEfficiencyPct, state.assumptions.inverterEfficiencyPct),
-      70,
-      99
-    );
-
-    const inverterIdleCandidate = Number(
-      assumptions.inverterIdleWatts ?? state.assumptions.inverterIdleWatts
-    );
-    if (Number.isFinite(inverterIdleCandidate)) {
-      state.assumptions.inverterIdleWatts = clamp(inverterIdleCandidate, 0, 80);
+  if (payload.assumptions) {
+    const previousYears = state.assumptions.fridgeClimateLookbackYears;
+    for (const key of Object.keys(DEFAULT_ASSUMPTIONS)) {
+      if (payload.assumptions[key] !== undefined) {
+        state.assumptions[key] = key === 'exposureMultipliers'
+          ? { ...state.assumptions.exposureMultipliers, ...payload.assumptions[key] }
+          : cloneValue(payload.assumptions[key]);
+      }
     }
-
-    state.assumptions.baseSunHours = clamp(
-      toPositiveNumber(assumptions.baseSunHours, state.assumptions.baseSunHours),
-      1,
-      10
-    );
-
-    if (typeof assumptions.pvWattsApiKey === "string") {
-      state.assumptions.pvWattsApiKey = assumptions.pvWattsApiKey.trim() || "DEMO_KEY";
-      state.solarPrecision.monthlySunHours = null;
-      state.solarPrecision.lastFetchedKey = "";
-      state.solarPrecision.status = "idle";
-      state.solarPrecision.error = "";
-    }
-
-    state.assumptions.ledWatts = clamp(
-      toPositiveNumber(assumptions.ledWatts, state.assumptions.ledWatts),
-      1,
-      300
-    );
-
-    state.assumptions.halogenWatts = clamp(
-      toPositiveNumber(assumptions.halogenWatts, state.assumptions.halogenWatts),
-      1,
-      500
-    );
-
-    state.assumptions.fridgeDutyFactor = clamp(
-      Number(assumptions.fridgeDutyFactor ?? state.assumptions.fridgeDutyFactor),
-      0.08,
-      1
-    );
-
-    state.assumptions.fridgeReferenceAmbientF = clamp(
-      Number(assumptions.fridgeReferenceAmbientF ?? state.assumptions.fridgeReferenceAmbientF),
-      40,
-      120
-    );
-
-    state.assumptions.fridgeClimateLookbackYears = clamp(
-      toPositiveNumber(
-        assumptions.fridgeClimateLookbackYears,
-        state.assumptions.fridgeClimateLookbackYears
-      ),
-      3,
-      30
-    );
-    if (state.assumptions.fridgeClimateLookbackYears !== previousFridgeClimateLookbackYears) {
-      fridgeClimateCache.clear();
-      resetFridgeClimateState();
-    }
-
-    state.assumptions.fridgeDayWeight = clamp(
-      Number(assumptions.fridgeDayWeight ?? state.assumptions.fridgeDayWeight),
-      0.45,
-      0.8
-    );
-
-    state.assumptions.fridgeWarmSlope = clamp(
-      Number(assumptions.fridgeWarmSlope ?? state.assumptions.fridgeWarmSlope),
-      0.005,
-      0.035
-    );
-
-    state.assumptions.fridgeCoolSlope = clamp(
-      Number(assumptions.fridgeCoolSlope ?? state.assumptions.fridgeCoolSlope),
-      0.002,
-      0.02
-    );
-
-    if (assumptions.exposureMultipliers && typeof assumptions.exposureMultipliers === "object") {
-      ["full", "partial", "minimal"].forEach((key) => {
-        if (assumptions.exposureMultipliers[key] !== undefined) {
-          state.assumptions.exposureMultipliers[key] = clamp(
-            Number(assumptions.exposureMultipliers[key]),
-            0.1,
-            1.2
-          );
-        }
-      });
-    }
-
+    if (previousYears !== state.assumptions.fridgeClimateLookbackYears) fridgeClimateCache.clear();
     state.solar.efficiencyPct = state.assumptions.panelSystemEfficiencyPct;
+    state.solarPrecision.monthlySunHours = null;
+    state.solarPrecision.lastFetchedKey = '';
   }
 
   if (payload.componentTiers && typeof payload.componentTiers === "object") {
@@ -2212,11 +2132,11 @@ function applySettingsFromPayload(payload) {
   if (payload.defaults && typeof payload.defaults === "object") {
     if (payload.defaults.solar && typeof payload.defaults.solar === "object") {
       const solar = payload.defaults.solar;
-      state.solar.watts = clamp(toPositiveNumber(solar.watts, state.solar.watts), 100, 1800);
+      state.solar.watts = clamp(Number(solar.watts ?? state.solar.watts), 0, 20000);
       state.solar.efficiencyPct = clamp(
         toPositiveNumber(solar.efficiencyPct, state.solar.efficiencyPct),
-        55,
-        95
+        1,
+        100
       );
 
       if (typeof solar.exposure === "string" && state.assumptions.exposureMultipliers[solar.exposure]) {
@@ -2257,8 +2177,8 @@ function applySettingsFromPayload(payload) {
       resetFridgeClimateState();
       state.fridgeAverageTempF = clamp(
         Number(fridge.averageTempF ?? state.fridgeAverageTempF),
-        -10,
-        110
+        -40,
+        130
       );
       if (typeof fridge.tempUnit === "string" && ["f", "c"].includes(fridge.tempUnit.toLowerCase())) {
         state.fridgeTempUnit = fridge.tempUnit.toLowerCase();
@@ -2310,21 +2230,21 @@ function applySettingsFromPayload(payload) {
       const alternator = payload.defaults.alternator;
       state.alternator.enabled = Boolean(alternator.enabled ?? state.alternator.enabled);
       state.alternator.powerWatts = clamp(
-        toPositiveNumber(alternator.powerWatts, state.alternator.powerWatts),
-        200,
-        3000
+        Number(alternator.powerWatts ?? state.alternator.powerWatts),
+        0,
+        20000
       );
       state.alternator.driveHoursDay = clamp(
         Number(alternator.driveHoursDay ?? state.alternator.driveHoursDay),
         0,
-        10
+        24
       );
     }
 
     if (payload.defaults.battery && typeof payload.defaults.battery === "object") {
       const battery = payload.defaults.battery;
-      state.autonomyDays = clamp(Number(battery.autonomyDays ?? state.autonomyDays), 1, 7);
-      state.installedAh = clamp(Number(battery.installedAh ?? state.installedAh), 100, 1800);
+      state.autonomyDays = clamp(Number(battery.autonomyDays ?? state.autonomyDays), 1, 30);
+      state.installedAh = clamp(Number(battery.installedAh ?? state.installedAh), 1, 20000);
 
       if (CHEMISTRY[battery.chemistry]) {
         state.chemistry = battery.chemistry;
@@ -2342,11 +2262,14 @@ function applySettingsFromPayload(payload) {
           return;
         }
 
+        for (const key of ['customWatts', 'customDutyFactor', 'measuredWh', 'quantity', 'startHour', 'powerPath', 'surgeWatts']) {
+          if (nextLoad[key] !== undefined) state.loads[device.id][key] = nextLoad[key];
+        }
         state.loads[device.id].enabled = Boolean(nextLoad.enabled ?? state.loads[device.id].enabled);
         state.loads[device.id].hours =
           device.id === "fridge"
             ? device.fixedDailyHours || 24
-            : clamp(Number(nextLoad.hours ?? state.loads[device.id].hours), 0, device.maxHours);
+            : clamp(Number(nextLoad.hours ?? state.loads[device.id].hours), 0, 24);
 
         if (device.supportsLightType && ["led", "halogen"].includes(nextLoad.lightType)) {
           state.loads[device.id].lightType = nextLoad.lightType;
@@ -2355,6 +2278,26 @@ function applySettingsFromPayload(payload) {
     }
   }
 
+  if (payload.defaults?.customLoads) {
+    for (const device of [...DEVICE_LIBRARY].filter(device => !BUILTIN_IDS.has(device.id))) {
+      loadUiMap.get(device.id)?.card.remove(); loadUiMap.delete(device.id);
+      DEVICE_LIBRARY.splice(DEVICE_LIBRARY.indexOf(device), 1); delete state.loads[device.id];
+    }
+    payload.defaults.customLoads.forEach(addCustomLoad);
+  }
+  if (payload.defaults?.trip) state.trip = { ...state.trip, ...cloneValue(payload.defaults.trip) };
+  else {
+    state.trip.nominalVoltage = state.voltage / 12 * (state.chemistry === 'lifepo4' ? 12.8 : 12);
+    state.trip.chargeVoltage = state.voltage / 12 * 14.2;
+  }
+  if (payload.componentMode) state.componentMode = payload.componentMode;
+  if (payload.manualComponents) for (const key of COMPONENT_KEYS) {
+    if (payload.manualComponents[key] !== undefined) state.manualComponents[key] = String(payload.manualComponents[key]);
+  }
+  state.activePreset = null;
+  setComponentModeUi(state.componentMode);
+  renderTripControls();
+  DEVICE_LIBRARY.forEach(refreshLoadDetails);
   refreshAssumptionUi();
   setSolarToggleUi(state.solar.enabled);
   setAlternatorToggleUi(state.alternator.enabled);
@@ -2401,6 +2344,8 @@ function applyPreset(presetName) {
     return;
   }
 
+  applyingPreset = true;
+  solarRequestNonce += 1;
   state.activePreset = presetName;
 
   DEVICE_LIBRARY.forEach((device) => {
@@ -2409,6 +2354,8 @@ function applyPreset(presetName) {
       return;
     }
 
+    Object.assign(state.loads[device.id], { customWatts: null, customDutyFactor: null, quantity: 1, measuredWh: null,
+      surgeWatts: device.watts, ...LOAD_DEFAULTS[device.id] });
     state.loads[device.id].enabled = presetValue.enabled;
     state.loads[device.id].hours =
       device.id === "fridge" ? device.fixedDailyHours || 24 : presetValue.hours;
@@ -2442,6 +2389,7 @@ function applyPreset(presetName) {
     };
   } else {
     state.solarPrecision.enabled = false;
+    solarRequestNonce += 1;
     state.solarPrecision.status = "idle";
     state.solarPrecision.error = "";
     state.solarPrecision.monthlySunHours = null;
@@ -2467,6 +2415,14 @@ function applyPreset(presetName) {
   state.chemistry = preset.chemistry;
   state.voltage = preset.voltage;
   state.installedAh = preset.installedAh;
+  state.trip.nominalVoltage = state.voltage / 12 * (state.chemistry === 'lifepo4' ? 12.8 : 12);
+  state.trip.chargeVoltage = state.voltage / 12 * 14.2;
+  state.trip.schedule = [];
+  renderTripControls();
+  DEVICE_LIBRARY.forEach(refreshLoadDetails);
+  resetManualSelections();
+  setComponentModeUi('auto');
+  byId('presetStatus').textContent = `${presetName === 'remote' ? 'Remote Work' : presetName === 'fulltime' ? 'Full-Time' : 'Weekender'} starting point.`;
 
   setSolarToggleUi(state.solar.enabled);
   setAlternatorToggleUi(state.alternator.enabled);
@@ -2496,94 +2452,14 @@ function applyPreset(presetName) {
   }
   updateMapSelectionLabel();
   calculate();
+  presetSignature = JSON.stringify(buildSettingsPayload());
+  applyingPreset = false;
 }
 
 function wirePresetButtons() {
   byId("presets").querySelectorAll(".preset-btn").forEach((button) => {
     button.addEventListener("click", () => applyPreset(button.dataset.preset));
   });
-}
-
-function computeOvernightWh() {
-  // Estimate actual nighttime energy draw (~10 hour window) instead of
-  // using an arbitrary fraction of total daily Wh. This gives a more
-  // realistic overnight battery floor for the recharge-adjusted sizing.
-  const nightHours = 10;
-  const fridgeModel = computeFridgeThermalModel();
-  let overnightWh = 0;
-
-  DEVICE_LIBRARY.forEach((device) => {
-    const load = state.loads[device.id];
-    if (!load || !load.enabled) return;
-
-    if (device.id === "fridge") {
-      // Fridge runs 24h; nighttime share is nightHours/24
-      overnightWh += fridgeModel.dailyWh * (nightHours / 24);
-    } else if (device.id === "heaterFan") {
-      // Heater runs primarily at night — cap at nightHours
-      const watts = getDeviceWatts(device, load);
-      const dutyFactor = getDeviceDutyFactor(device);
-      overnightWh += watts * Math.min(load.hours, nightHours) * dutyFactor;
-    } else if (load.hours >= 24) {
-      // 24h loads (e.g. Starlink always-on) contribute their night share
-      const watts = getDeviceWatts(device, load);
-      const dutyFactor = getDeviceDutyFactor(device);
-      overnightWh += watts * nightHours * dutyFactor;
-    }
-  });
-
-  return overnightWh;
-}
-
-function computeBreakdown() {
-  const fridgeModel = computeFridgeThermalModel();
-  const entries = [];
-  let acDailyWh = 0;
-  let acTotalHours = 0;
-
-  DEVICE_LIBRARY.forEach((device) => {
-    const load = state.loads[device.id];
-    const watts = getDeviceWatts(device, load);
-    const dutyFactor = getDeviceDutyFactor(device);
-    const dailyWh = device.id === "fridge" ? fridgeModel.dailyWh : watts * load.hours * dutyFactor;
-
-    if (!load.enabled || dailyWh <= 0) {
-      return;
-    }
-
-    entries.push({
-      id: device.id,
-      name: device.name,
-      wh: dailyWh
-    });
-
-    if (AC_LOAD_IDS.has(device.id)) {
-      acDailyWh += dailyWh;
-      // Track the longest-running AC device — the inverter idles for
-      // that window since devices typically overlap rather than run
-      // back-to-back across the day.
-      acTotalHours = Math.max(acTotalHours, load.hours);
-    }
-  });
-
-  if (acDailyWh > 0) {
-    const inverterEfficiency = clamp(state.assumptions.inverterEfficiencyPct / 100, 0.7, 0.99);
-    const conversionLossWh = acDailyWh * (1 / inverterEfficiency - 1);
-    // Cap idle hours at 24 in case summed device hours exceed a full day
-    const idleHours = Math.min(acTotalHours, 24);
-    const idleWh = Math.max(0, state.assumptions.inverterIdleWatts) * idleHours;
-    const inverterOverheadWh = conversionLossWh + idleWh;
-
-    if (inverterOverheadWh > 0.1) {
-      entries.push({
-        id: "inverter-overhead",
-        name: "Inverter overhead",
-        wh: inverterOverheadWh
-      });
-    }
-  }
-
-  return entries;
 }
 
 function updateBreakdown(entries) {
@@ -2604,7 +2480,7 @@ function updateBreakdown(entries) {
       return `
         <article class="break-row">
           <div class="break-top">
-            <span>${entry.name}</span>
+            <span>${escapeHtml(entry.name)}</span>
             <span>${formatEnergy(entry.wh)}</span>
           </div>
           <div class="break-track">
@@ -2616,307 +2492,325 @@ function updateBreakdown(entries) {
     .join("");
 }
 
-function calculate() {
-  const entries = computeBreakdown();
-
-  const totalDailyWh = entries.reduce((sum, entry) => sum + entry.wh, 0);
-  const sunHoursModel = getSolarSunHoursModel();
-  const estimatedSunHours = sunHoursModel.adjustedHours;
-  const solarEfficiencyFactor = state.solar.efficiencyPct / 100;
-  const alternatorEfficiencyFactor = state.assumptions.alternatorEfficiencyPct / 100;
-
-  const solarDailyWh = state.solar.enabled
-    ? state.solar.watts * estimatedSunHours * solarEfficiencyFactor
-    : 0;
-
-  const alternatorDailyWh = state.alternator.enabled
-    ? alternatorEffectiveWh(state.alternator.powerWatts, state.alternator.driveHoursDay, alternatorEfficiencyFactor)
-    : 0;
-
-  const rechargeWh = solarDailyWh + alternatorDailyWh;
-  const rawNetWh = totalDailyWh - rechargeWh;
-  const netBatteryWh = Math.max(rawNetWh, 0);
-
-  const dod = CHEMISTRY[state.chemistry].dod;
-  const coldDerating = batteryTempDeratingFactor(state.fridgeAverageTempF, state.chemistry);
-  const effectiveDod = dod * coldDerating;
-  const noRechargeWh = (totalDailyWh * state.autonomyDays) / effectiveDod;
-
-  const overnightFloorWh = computeOvernightWh();
-  const rechargeAdjustedDraw = Math.max(totalDailyWh - rechargeWh, overnightFloorWh);
-  const rechargeWhRecommendation = (rechargeAdjustedDraw * state.autonomyDays) / effectiveDod;
-
-  const recommendedAhNoRecharge = noRechargeWh / state.voltage;
-  const recommendedAhRecharge = rechargeWhRecommendation / state.voltage;
-
-  const installedNominalWh = state.installedAh * state.voltage;
-  const installedUsableWh = installedNominalWh * effectiveDod;
-
-  const runtimeNoRechargeDays = totalDailyWh > 0 ? installedUsableWh / totalDailyWh : Infinity;
-  const runtimeWithRechargeDays = rawNetWh < 0.01 ? Infinity : installedUsableWh / rawNetWh;
-  const dailyAh = state.voltage > 0 ? totalDailyWh / state.voltage : 0;
-
-  lastResults = {
-    recommendedAhNoRecharge,
-    recommendedAhRecharge
-  };
-
-  byId("dailyUseBig").textContent = `${formatEnergy(totalDailyWh)}/day`;
-  byId("mobileDailyUse").textContent = `${formatEnergy(totalDailyWh)}/day`;
-  byId("dailyUseAh").textContent = `${dailyAh.toFixed(1)} Ah/day @ ${state.voltage}V`;
-  byId("usagePersona").textContent = energyPersona(totalDailyWh);
-  byId("dailyRecharge").textContent = formatEnergy(rechargeWh);
-  byId("autonomyTarget").textContent = `${state.autonomyDays.toFixed(0)} days`;
-  byId("estimatedSunHours").textContent = `${estimatedSunHours.toFixed(1)} hr`;
-  const sunHoursSource = byId("sunHoursSource");
-  if (sunHoursSource) {
-    if (!state.solarPrecision.enabled) {
-      sunHoursSource.textContent = sunHoursModel.source;
-    } else if (!state.solarPrecision.hasPinned) {
-      sunHoursSource.textContent = "Precision mode on. Pin a location to use PVWatts monthly sun-hours.";
-    } else if (state.solarPrecision.status === "loading") {
-      sunHoursSource.textContent = "Precision mode loading PVWatts data. Using manual baseline temporarily.";
-    } else if (state.solarPrecision.status === "error") {
-      sunHoursSource.textContent = `PVWatts request failed (${state.solarPrecision.error}). Using manual baseline.`;
-    } else {
-      sunHoursSource.textContent = sunHoursModel.source;
-    }
+function addLoadDetails(card, device) {
+  const config = state.loads[device.id];
+  const details = document.createElement('details');
+  details.className = 'load-details';
+  details.innerHTML = `<summary>Schedule, quantity & measured use</summary>
+    <div class="planning-fields">
+      <label>Quantity<input required data-detail="quantity" type="number" min="1" max="20" step="1" value="${config.quantity ?? 1}" /></label>
+      <label>Starts at (0–23h)<input required data-detail="startHour" type="number" min="0" max="23" step="1" value="${config.startHour ?? 9}" /></label>
+      <label>Power connection<select data-detail="powerPath"><option value="dc">Direct DC</option><option value="usb">USB / DC converter</option><option value="ac">AC inverter</option></select></label>
+      ${device.id !== 'fridge' ? `<label>Daily runtime (hours)<input required data-detail="hours" type="number" min="0" max="24" step="any" value="${config.hours}" /></label><label>Running duty (%)<input required data-detail="customDutyFactor" type="number" min="0" max="100" step="any" value="${getDeviceDutyFactor(device) * 100}" /></label>` : ''}
+      <label>Measured Wh/day per device<input data-detail="measuredWh" type="number" min="0" max="100000" placeholder="Optional" value="${config.measuredWh ?? ''}" /></label>
+      <label>Startup / peak watts<input required data-detail="surgeWatts" type="number" min="0" max="30000" value="${config.surgeWatts ?? device.watts}" /></label>
+    </div>
+    <p class="load-note">Operating watts estimate daily energy; peak watts check inverter and battery limits. Measured energy overrides cycling and watts × hours, but keeps the schedule. Blank removes the override.</p>`;
+  details.querySelector('select').value = config.powerPath ?? 'dc';
+  details.querySelectorAll('input, select').forEach(input => {
+    input.setAttribute('aria-label', `${device.name}: ${input.parentElement.firstChild.textContent.trim()}`);
+    input.addEventListener('input', () => {
+      if (!input.checkValidity()) return;
+      const key = input.dataset.detail;
+      state.loads[device.id][key] = key === 'powerPath' ? input.value : key === 'measuredWh' && input.value === '' ? null : Number(input.value) / (key === 'customDutyFactor' ? 100 : 1);
+      if (key === 'hours') {
+        const ui = loadUiMap.get(device.id);
+        if (ui.slider) ui.slider.value = input.value;
+        updateLoadCard(device.id);
+      }
+      if (device.id === 'fridge') updateLoadCard(device.id);
+      calculate();
+    });
+  });
+  card.append(details);
+  if (device.id === 'starlink') {
+    const label = document.createElement('label');
+    label.className = 'select-field';
+    label.innerHTML = `Hardware preset<select aria-label="Starlink hardware preset"><option value="">Custom / generic</option><option value="32">Mini (32 W planning average)</option><option value="88">Standard 4 (88 W planning average)</option></select>`;
+    label.querySelector('select').addEventListener('change', event => {
+      if (!event.target.value) return;
+      config.customWatts = Number(event.target.value); config.surgeWatts = Number(event.target.value);
+      updateLoadCard(device.id); calculate();
+    });
+    details.append(label);
+    const note = document.createElement('p'); note.className = 'load-note';
+    note.innerHTML = `Manufacturer average ranges: <a href="https://www.starlink.com/public-files/specification_sheet_mini.pdf" target="_blank" rel="noopener">Mini 25–40 W</a>, <a href="https://starlink.com/public-files/specification_sheet_standard4.pdf" target="_blank" rel="noopener">Standard 4 75–100 W</a>. Select your actual power connection and verify peak draw. Sources checked October 2026.`;
+    details.append(note);
   }
-
-  if (rawNetWh >= 0) {
-    byId("netFromBattery").textContent = formatEnergy(netBatteryWh);
-  } else {
-    byId("netFromBattery").textContent = `${formatEnergy(Math.abs(rawNetWh))} surplus`;
+  const pin = card.querySelector('[data-change-location]');
+  if (pin) pin.addEventListener('click', () => openMapModal('fridge'));
+  if (!BUILTIN_IDS.has(device.id)) {
+    const remove = document.createElement('button');
+    remove.type = 'button'; remove.className = 'ghost-btn compact-btn'; remove.textContent = 'Remove appliance';
+    remove.addEventListener('click', () => {
+      DEVICE_LIBRARY.splice(DEVICE_LIBRARY.indexOf(device), 1);
+      delete state.loads[device.id]; loadUiMap.delete(device.id); card.remove(); calculate();
+    });
+    card.append(remove);
   }
-
-  byId("recNoChargeAh").textContent = formatAh(recommendedAhNoRecharge);
-  byId("recNoChargeWh").textContent = `${formatEnergy(noRechargeWh)} total bank`;
-  byId("recRechargeAh").textContent = formatAh(recommendedAhRecharge);
-  byId("recRechargeWh").textContent = `${formatEnergy(rechargeWhRecommendation)} total bank`;
-
-  byId("runtimeNoCharge").textContent = formatDays(runtimeNoRechargeDays);
-  byId("runtimeWithRecharge").textContent = formatDays(runtimeWithRechargeDays);
-
-  if (totalDailyWh === 0) {
-    byId("runwayText").textContent = "No active loads. Turn on appliances to begin sizing your battery.";
-  } else if (runtimeNoRechargeDays >= state.autonomyDays) {
-    byId("runwayText").textContent = "Your planned battery meets your reserve goal even with zero charging.";
-  } else {
-    byId("runwayText").textContent = "Your planned battery falls short of your reserve target without charging.";
-  }
-
-  if (rawNetWh <= 0) {
-    byId("runwayText").textContent += " Daily recharge currently matches or beats daily consumption.";
-  }
-
-  if (coldDerating < 1) {
-    byId("runwayText").textContent += ` Cold weather derating applied: ${Math.round(coldDerating * 100)}% effective capacity at ${formatFridgeTemperature(state.fridgeAverageTempF)}.`;
-  }
-
-  const batteryAutoAh = pickTier(Math.ceil(recommendedAhNoRecharge), state.componentTiers.batteryAh);
-  const solarSafetyMargin = 1.25;
-  const solarAutoWatts =
-    totalDailyWh > 0
-      ? pickTier(
-          Math.ceil(solarSafetyMargin * totalDailyWh / Math.max(estimatedSunHours * solarEfficiencyFactor, 0.1)),
-          state.componentTiers.solarWatts
-        )
-      : 0;
-
-  const solarChargerAutoAmps =
-    solarAutoWatts > 0
-      ? pickTier(
-          Math.ceil((solarAutoWatts / state.voltage) * 1.25),
-          state.componentTiers.solarChargerAmps
-        )
-      : 0;
-
-  const solarOffsetWh = solarAutoWatts * estimatedSunHours * solarEfficiencyFactor;
-  const alternatorNeedWh = Math.max(totalDailyWh - solarOffsetWh, 0);
-  const alternatorAutoWatts =
-    state.alternator.driveHoursDay > 0 && alternatorNeedWh > 0
-      ? pickTier(
-          Math.ceil(
-            alternatorNeedWh / Math.max(alternatorEffectiveHours(state.alternator.driveHoursDay) * alternatorEfficiencyFactor, 0.1)
-          ),
-          state.componentTiers.alternatorWatts
-        )
-      : 0;
-
-  const shoreAutoAmps =
-    totalDailyWh > 0
-      ? pickTier(
-          Math.ceil(Math.max(dailyAh / 4, batteryAutoAh * (state.chemistry === "agm" ? 0.07 : 0.1))),
-          state.componentTiers.shoreAmps
-        )
-      : 0;
-
-  const acPeakWatts = DEVICE_LIBRARY.reduce((sum, device) => {
-    const load = state.loads[device.id];
-    if (!load || !load.enabled || !AC_LOAD_IDS.has(device.id)) {
-      return sum;
-    }
-
-    return sum + getDeviceWatts(device, load);
-  }, 0);
-
-  const inverterAutoWatts = pickTier(
-    Math.ceil(Math.max(acPeakWatts * 1.25, 600)),
-    state.componentTiers.inverterWatts
-  );
-
-  const batterySelected = resolveComponentValue("batteryAh", batteryAutoAh);
-  const solarSelected = resolveComponentValue("solarWatts", solarAutoWatts);
-  const solarChargerSelected = resolveComponentValue("solarChargerAmps", solarChargerAutoAmps);
-  const alternatorSelected = resolveComponentValue("alternatorWatts", alternatorAutoWatts);
-  const shoreSelected = resolveComponentValue("shoreAmps", shoreAutoAmps);
-  const inverterSelected = resolveComponentValue("inverterWatts", inverterAutoWatts);
-
-  setModePill("componentBatteryMode", batterySelected.manual);
-  setModePill("componentSolarMode", solarSelected.manual);
-  setModePill("componentSolarChargerMode", solarChargerSelected.manual);
-  setModePill("componentAlternatorMode", alternatorSelected.manual);
-  setModePill("componentShoreMode", shoreSelected.manual);
-  setModePill("componentInverterMode", inverterSelected.manual);
-
-  byId("componentBattery").textContent =
-    batterySelected.value > 0 ? `${batterySelected.value} Ah @ ${state.voltage}V` : "No battery selected";
-  const batteryNoteBase = `${state.autonomyDays} days reserve using ${Math.round(dod * 100)}% usable capacity.`;
-  const batteryNoteCold = coldDerating < 1 ? ` Cold derated to ${Math.round(effectiveDod * 100)}% at ${formatFridgeTemperature(state.fridgeAverageTempF)}.` : "";
-  byId("componentBatteryNote").textContent = batterySelected.manual
-    ? "Manual override enabled for battery bank sizing."
-    : batteryNoteBase + batteryNoteCold;
-
-  byId("componentSolar").textContent =
-    solarSelected.value > 0 ? `${solarSelected.value} W` : "No solar panels";
-  byId("componentSolarNote").textContent = solarSelected.manual
-    ? "Manual override enabled for solar array size."
-    : `Modeled with ${estimatedSunHours.toFixed(1)} sun-hr/day and ${state.solar.efficiencyPct}% efficiency + 25% safety margin (${sunHoursModel.usingPvWatts ? "PVWatts monthly model" : "manual baseline"}).`;
-
-  byId("componentSolarCharger").textContent =
-    solarChargerSelected.value > 0 ? `${solarChargerSelected.value} A MPPT` : "No MPPT";
-  byId("componentSolarChargerNote").textContent = solarChargerSelected.manual
-    ? "Manual override enabled for charge controller size."
-    : solarChargerAutoAmps > 0
-      ? "Includes 25% controller headroom."
-      : "Controller appears once a solar array is sized.";
-
-  const alternatorEquivalentAmps = alternatorSelected.value > 0 ? alternatorSelected.value / state.voltage : 0;
-
-  if (alternatorSelected.manual) {
-    byId("componentAlternator").textContent =
-      alternatorSelected.value > 0 ? `${alternatorSelected.value} W DC-DC` : "No DC-DC";
-    byId("componentAlternatorNote").textContent =
-      alternatorSelected.value > 0
-        ? `Manual override. About ${alternatorEquivalentAmps.toFixed(1)}A @ ${state.voltage}V.`
-        : "Manual override set to no alternator charger.";
-  } else if (state.alternator.driveHoursDay <= 0) {
-    byId("componentAlternator").textContent = "Set drive time";
-    byId("componentAlternatorNote").textContent =
-      "Add drive hours/day to estimate alternator power sizing.";
-  } else {
-    byId("componentAlternator").textContent =
-      alternatorAutoWatts > 0 ? `${alternatorAutoWatts} W DC-DC` : "300 W DC-DC";
-    byId("componentAlternatorNote").textContent =
-      alternatorAutoWatts > 0
-        ? `Based on ${state.alternator.driveHoursDay.toFixed(1)} drive hr/day after solar offset.`
-        : "Minimal alternator support because solar already covers most daily use.";
-
-    if (!state.alternator.enabled) {
-      byId("componentAlternatorNote").textContent += " Alternator charging is currently toggled off.";
-    }
-  }
-
-  byId("componentShore").textContent =
-    shoreSelected.value > 0 ? `${shoreSelected.value} A charger` : "No shore charger";
-  byId("componentShoreNote").textContent = shoreSelected.manual
-    ? "Manual override enabled for shore charger size."
-    : shoreAutoAmps > 0
-      ? `${formatEnergy(shoreAutoAmps * state.voltage * 4)} restored in ~4 hr on shore power.`
-      : "Enable loads to estimate shore charging needs.";
-
-  byId("componentInverter").textContent =
-    inverterSelected.value > 0 ? `${inverterSelected.value} W pure sine` : "No inverter";
-  byId("componentInverterNote").textContent = inverterSelected.manual
-    ? "Manual override enabled for inverter size."
-    : acPeakWatts > 0
-      ? `Built from simultaneous AC loads with 25% headroom. Energy model uses ${state.assumptions.inverterEfficiencyPct}% efficiency + ${state.assumptions.inverterIdleWatts}W idle draw.`
-      : "Base recommendation for light AC devices.";
-
-  updateBreakdown(entries);
-  updateSystemWarnings(totalDailyWh, acPeakWatts, dailyAh, coldDerating, inverterSelected.value);
 }
 
-function updateSystemWarnings(totalDailyWh, acPeakWatts, dailyAh, coldDerating, inverterWatts) {
-  const warnings = [];
-
-  // Peak current draw warning
-  const peakAmps = acPeakWatts / state.voltage;
-  if (peakAmps > 150 && state.voltage === 12) {
-    warnings.push("Peak AC draw exceeds 150A at 12V. This requires very heavy cabling (2/0 AWG or larger). Consider a 24V system.");
+function refreshLoadDetails(device) {
+  const card = loadUiMap.get(device.id)?.card;
+  if (!card) return;
+  for (const input of card.querySelectorAll('[data-detail]')) {
+    input.value = input.dataset.detail === 'customDutyFactor' ? getDeviceDutyFactor(device) * 100 : state.loads[device.id][input.dataset.detail] ?? '';
   }
+}
 
-  // Total daily draw vs battery size
-  const usableAh = state.installedAh * CHEMISTRY[state.chemistry].dod * coldDerating;
-  if (totalDailyWh > 0 && totalDailyWh / state.voltage > usableAh) {
-    warnings.push("Daily draw exceeds your usable battery capacity. You will fully discharge every day even with a full charge.");
+function addCustomLoad(load) {
+  const device = { id: load.id, name: load.name, watts: load.watts ?? 50, dutyFactor: 1,
+    note: 'Enter measured operating watts or daily energy. Choose how and when it is powered.',
+    maxHours: 24, step: 0.25, defaultOn: true, defaultHours: 1 };
+  DEVICE_LIBRARY.push(device);
+  state.loads[device.id] = { enabled: true, hours: 1, lightType: null, customWatts: null,
+    quantity: 1, measuredWh: null, startHour: 18, powerPath: 'dc', surgeWatts: device.watts, ...load };
+  byId('loadsGrid').append(createLoadCard(device));
+}
+
+function ensureTripSchedule() {
+  state.trip.days = Math.round(state.trip.days);
+  while (state.trip.schedule.length < state.trip.days) state.trip.schedule.push({
+    solarFactor: 1, driveHours: state.alternator.driveHoursDay, driveStartHour: 10, shoreHours: 0, shoreStartHour: 18
+  });
+  state.trip.schedule.length = state.trip.days;
+}
+
+function renderTripControls() {
+  ensureTripSchedule();
+  for (const key of Object.keys(state.trip)) {
+    const input = byId(key === 'days' ? 'tripDays' : key);
+    if (input) input.value = typeof state.trip[key] === 'number' ? Number(state.trip[key].toFixed(6)) : state.trip[key];
   }
+  const wrap = byId('tripSchedule');
+  wrap.innerHTML = `<table class="plan-table"><caption>Daily charging schedule</caption><thead><tr><th>Day</th><th>Solar %</th><th>Drive h</th><th>Start h</th><th>Shore h</th><th>Start h</th></tr></thead><tbody>${state.trip.schedule.map((day, index) => `<tr><th scope="row">${index + 1}</th>${[
+    ['solarFactor', day.solarFactor * 100, 0, 120, 5, 'solar percent'],
+    ['driveHours', day.driveHours, 0, 24, 0.25, 'driving hours'],
+    ['driveStartHour', day.driveStartHour, 0, 23, 1, 'drive start hour'],
+    ['shoreHours', day.shoreHours, 0, 24, 0.5, 'shore hours'],
+    ['shoreStartHour', day.shoreStartHour, 0, 23, 1, 'shore start hour']
+  ].map(([key, value, min, max, step, label]) => `<td><input type="number" required data-day="${index}" data-day-key="${key}" min="${min}" max="${max}" step="${key.endsWith('StartHour') ? 1 : 'any'}" value="${value}" aria-label="Day ${index + 1} ${label}" /></td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  wrap.querySelectorAll('input').forEach(input => input.addEventListener('input', () => {
+    if (!input.checkValidity() || input.value === '') return;
+    state.trip.schedule[Number(input.dataset.day)][input.dataset.dayKey] = Number(input.value) / (input.dataset.dayKey === 'solarFactor' ? 100 : 1);
+    calculate();
+  }));
+}
 
-  // A/C on a small battery
-  if (state.loads.ac && state.loads.ac.enabled && state.installedAh < 200) {
-    warnings.push("Running A/C on a battery under 200Ah is impractical. A/C draws heavily and will drain small banks very quickly.");
+function wirePlanningControls() {
+  for (const key of Object.keys(state.trip).filter(key => key !== 'schedule')) {
+    const input = byId(key === 'days' ? 'tripDays' : key);
+    if (!input) continue;
+    input.required = true;
+    input.addEventListener('input', () => {
+      if (!input.checkValidity()) return;
+      state.trip[key] = Number(input.value);
+      if (key === 'days') renderTripControls();
+      calculate();
+    });
   }
-
-  // Induction + A/C simultaneous peak
-  if (state.loads.ac && state.loads.ac.enabled && state.loads.induction && state.loads.induction.enabled) {
-    const combinedPeak = getDeviceWatts(
-      DEVICE_LIBRARY.find((d) => d.id === "ac"),
-      state.loads.ac
-    ) + getDeviceWatts(
-      DEVICE_LIBRARY.find((d) => d.id === "induction"),
-      state.loads.induction
-    );
-    if (combinedPeak > inverterWatts && inverterWatts > 0) {
-      warnings.push(`A/C + induction cooktop combined peak (${combinedPeak}W) exceeds your inverter capacity (${inverterWatts}W). Avoid running both simultaneously.`);
+  byId('cloudyScenario').addEventListener('click', () => {
+    ensureTripSchedule();
+    state.trip.schedule.slice(0, 3).forEach(day => { day.solarFactor = 0.15; day.driveHours = 0; day.shoreHours = 0; });
+    renderTripControls(); calculate();
+  });
+  byId('resetSchedule').addEventListener('click', () => { state.trip.schedule = []; renderTripControls(); calculate(); });
+  byId('addLoadForm').addEventListener('submit', event => {
+    event.preventDefault();
+    const name = byId('customLoadName').value.trim();
+    if (!name || DEVICE_LIBRARY.filter(device => !BUILTIN_IDS.has(device.id)).length >= 30) return;
+    addCustomLoad({ id: `custom-${crypto.randomUUID()}`, name, watts: 50 });
+    byId('customLoadName').value = ''; calculate();
+  });
+  byId('applySuggested').addEventListener('click', () => {
+    if (!lastPlan) return;
+    state.installedAh = lastPlan.batterySize.value;
+    if (lastPlan.config.solarWatts > 0) {
+      state.solar.enabled = true; state.solar.watts = lastPlan.suggestedSolar;
     }
+    if (lastPlan.config.alternatorWatts > 0) {
+      state.alternator.enabled = true;
+      state.alternator.powerWatts = Math.max(lastPlan.alternatorSize.value, lastPlan.config.alternatorWatts);
+    }
+    resetManualSelections(); setComponentModeUi('auto');
+    uiSetters.installedAh(state.installedAh); uiSetters.solarWatts(state.solar.watts); uiSetters.altPower(state.alternator.powerWatts);
+    setSolarToggleUi(state.solar.enabled); setAlternatorToggleUi(state.alternator.enabled);
+    refreshRechargeVisibility(); calculate();
+  });
+  byId('sharePlan').addEventListener('click', async () => {
+    const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(buildSettingsPayload()))));
+    const url = new URL(window.location.href); url.hash = `plan=${encoded}`;
+    byId('shareLink').value = url.href;
+    try {
+      await navigator.clipboard.writeText(url.href);
+      byId('settingsStatus').textContent = 'Share link copied. It contains your plan and any pinned locations; API keys are excluded.';
+    } catch {
+      byId('shareLink').classList.remove('hidden'); byId('shareLink').select();
+      byId('settingsStatus').textContent = 'Copy the selected link. It includes your plan and pinned locations.';
+    }
+  });
+  byId('printPlan').addEventListener('click', () => window.print());
+  document.querySelector('label[for="uploadSettings"]').addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); byId('uploadSettings').click(); }
+  });
+  byId('loadsGrid').addEventListener('toggle', scheduleLoadGridLayout, true);
+}
+
+function makeLoadProfile() {
+  const fridge = computeFridgeThermalModel();
+  const fridgeWeights = Array.from({ length: 24 }, (_, hour) => hour >= 7 && hour < 21 ? fridge.dayDuty : fridge.nightDuty);
+  const fridgeWeightTotal = fridgeWeights.reduce((sum, value) => sum + value, 0);
+  return buildLoadProfile(DEVICE_LIBRARY.map(device => {
+    const load = state.loads[device.id];
+    return { ...load, id: device.id, name: device.name, watts: getDeviceWatts(device, load),
+      dutyFactor: getDeviceDutyFactor(device),
+      hourlyWh: device.id === 'fridge' && load.measuredWh == null ? fridgeWeights.map(value => fridge.dailyWh * value / fridgeWeightTotal) : undefined };
+  }), { inverterEfficiency: state.assumptions.inverterEfficiencyPct / 100,
+    inverterIdleWatts: state.assumptions.inverterIdleWatts, inverterOnHours: state.trip.inverterOnHours });
+}
+
+function makeSystem(profile) {
+  const selected = {};
+  selected.batteryAh = resolveComponentValue('batteryAh', state.installedAh);
+  selected.solarWatts = resolveComponentValue('solarWatts', state.solar.enabled ? state.solar.watts : 0);
+  selected.alternatorWatts = resolveComponentValue('alternatorWatts', state.alternator.enabled ? state.alternator.powerWatts : 0);
+  selected.solarChargerAmps = resolveComponentValue('solarChargerAmps', pickTier(selected.solarWatts.value / state.trip.chargeVoltage * 1.25, state.componentTiers.solarChargerAmps));
+  selected.shoreAmps = resolveComponentValue('shoreAmps', state.trip.shoreAmps);
+  selected.inverterWatts = resolveComponentValue('inverterWatts', pickTier(Math.max(profile.peakAcWatts * 1.25, state.trip.inverterOnHours > 0 ? 600 : 0), state.componentTiers.inverterWatts));
+  const sun = getSolarSunHoursModel();
+  const config = { ...state.trip, batteryAh: selected.batteryAh.value, solarWatts: selected.solarWatts.value,
+    solarChargerAmps: selected.solarChargerAmps.value, alternatorWatts: selected.alternatorWatts.value,
+    shoreAmps: selected.shoreAmps.value, chemistry: state.chemistry, dod: CHEMISTRY[state.chemistry].dod,
+    sunHours: sun.adjustedHours, solarEfficiency: state.solar.efficiencyPct / 100 };
+  return { selected, config, sun };
+}
+
+function renderChart(trip) {
+  const x = hour => 42 + hour / (state.trip.days * 24) * 500;
+  const y = soc => 154 - soc * 1.3;
+  const path = trip.samples.map((sample, index) => `${index ? 'L' : 'M'}${x(sample.hour).toFixed(1)},${y(sample.socPct).toFixed(1)}`).join(' ');
+  const svg = byId('batteryChart');
+  svg.innerHTML = `<title>Hourly battery charge: minimum ${trip.minimumSocPct.toFixed(1)}%, reserve ${trip.reservePct.toFixed(0)}%</title>
+    ${[0, 50, 100].map(soc => `<line x1="42" x2="542" y1="${y(soc)}" y2="${y(soc)}" class="chart-grid"/><text x="4" y="${y(soc) + 4}">${soc}%</text>`).join('')}
+    <rect x="42" y="${y(trip.reservePct)}" width="500" height="${154 - y(trip.reservePct)}" class="chart-reserve-area"/>
+    <line x1="42" x2="542" y1="${y(trip.reservePct)}" y2="${y(trip.reservePct)}" class="chart-reserve"/>
+    <path d="${path}" class="chart-battery"/>
+    ${Array.from({length: Math.min(state.trip.days, 7) + 1}, (_, i) => {
+      const day = i * state.trip.days / Math.min(state.trip.days, 7);
+      return `<text x="${x(day * 24)}" y="178" text-anchor="middle">${day === 0 ? 'Start' : `Day ${Math.round(day)}`}</text>`;
+    }).join('')}`;
+  svg.setAttribute('aria-label', `Battery charge over ${state.trip.days} days. Minimum ${trip.minimumSocPct.toFixed(1)} percent. Reserve ${trip.reservePct.toFixed(0)} percent.`);
+  byId('chartSummary').textContent = `Minimum ${trip.minimumSocPct.toFixed(1)}% · End ${trip.daily.at(-1).endSocPct.toFixed(1)}% · Reserve ${trip.reservePct.toFixed(0)}%. Shaded area is below reserve.`;
+  byId('dailyResults').innerHTML = `<table class="plan-table"><caption>Daily energy at the battery bus</caption><thead><tr><th>Day</th><th>Use</th><th>Solar</th><th>Drive</th><th>Shore</th><th>Stored</th><th>Unused</th><th>End</th></tr></thead><tbody>${trip.daily.map(day => `<tr><th scope="row">${day.day}</th>${['loadWh','solarWh','alternatorWh','shoreWh','acceptedWh','curtailedWh'].map(key => `<td>${formatEnergy(day[key])}</td>`).join('')}<td>${day.endSocPct.toFixed(0)}%</td></tr>`).join('')}</tbody></table><p class="assumption-note">Stored is charging accepted by the battery after losses; other generation can serve loads directly. Unused generation is limited by full capacity, charger limits, or temperature.</p>`;
+}
+
+function calculate() {
+  if (!byId('tripVerdict')) return;
+  ensureTripSchedule();
+  const profile = makeLoadProfile();
+  const { selected, config, sun } = makeSystem(profile);
+  const trip = simulateTrip(config, profile, state.trip.schedule);
+  const tripMinimum = sizeBatteryForTrip(config, profile, state.trip.schedule);
+  const floor = trip.reservePct / 100;
+  const usableFraction = Math.max(0, config.startSocPct / 100 - floor);
+  const capacityFactor = temperatureCapacity(config.batteryTempF) * config.healthPct / 100;
+  const minimumAh = profile.dailyWh === 0 ? 0 : usableFraction > 0 ? profile.dailyWh * state.autonomyDays / (config.nominalVoltage * capacityFactor * usableFraction) : Infinity;
+  const batterySize = pickSize(Math.max(Number.isFinite(minimumAh) ? minimumAh : 0, tripMinimum.value ?? 0), state.componentTiers.batteryAh);
+  const solarRequired = config.solarWatts > 0 && sun.adjustedHours > 0 ? profile.dailyWh * 1.25 / (sun.adjustedHours * config.solarEfficiency) : 0;
+  const solarSize = pickSize(solarRequired, state.componentTiers.solarWatts);
+  const suggestedSolar = Math.min(solarSize.value, config.roofSolarMax);
+  const averageDriveHours = state.trip.schedule.reduce((sum, day) => sum + day.driveHours, 0) / state.trip.days;
+  const typicalGap = Math.max(0, profile.dailyWh - suggestedSolar * sun.adjustedHours * config.solarEfficiency);
+  const alternatorSize = pickSize(config.alternatorWatts > 0 && averageDriveHours > 0 ? typicalGap / averageDriveHours : 0, state.componentTiers.alternatorWatts);
+  const inverterSize = pickSize(profile.peakAcWatts * 1.25, state.componentTiers.inverterWatts);
+  const controllerSize = pickSize(config.solarWatts / config.chargeVoltage * 1.25, state.componentTiers.solarChargerAmps);
+  const warnings = [];
+  const faults = [];
+  if (profile.acEnergyWh > 0 && selected.inverterWatts.value === 0) faults.push('AC appliances need an inverter or a different power connection.');
+  else if (selected.inverterWatts.value < profile.peakAcWatts) faults.push(`Scheduled AC peak (${Math.ceil(profile.peakAcWatts)} W) exceeds the selected ${selected.inverterWatts.value} W inverter. Change the schedule or inverter.`);
+  const peakAmps = profile.peakBatteryWatts / (config.nominalVoltage * 0.9);
+  if (peakAmps > config.maxDischargeAmps) faults.push(`Estimated battery peak is ${Math.ceil(peakAmps)} A at 90% of nominal voltage, above your ${config.maxDischargeAmps} A discharge limit. Check battery/BMS and surge ratings.`);
+  if (config.solarWatts > 0 && config.solarChargerAmps === 0) faults.push('Solar panels have no charge controller. Solar contributes zero energy.');
+  if (state.trip.schedule.some(day => day.shoreHours > 0) && config.shoreAmps === 0) warnings.push('Shore time is entered, but no shore charger is selected.');
+  if (!trip.chargeAllowed) warnings.push(`Battery temperature is below your ${config.chargeCutoffF}°F lithium charge cutoff. Charging is blocked in this model. Follow your battery manufacturer's limit.`);
+  if (config.solarWatts > config.roofSolarMax) warnings.push(`Selected solar exceeds your ${config.roofSolarMax} W space limit. Verify the layout or use portable panels.`);
+  if (solarRequired > config.roofSolarMax) warnings.push(`Typical solar-only sizing needs about ${Math.ceil(solarRequired)} W, above your space limit. Plan driving, shore charging, or lower use.`);
+  if (batterySize.exceeds) warnings.push(`Battery requirement exceeds listed single-bank tiers: at least ${batterySize.value} Ah. Check a multi-battery configuration.`);
+  if (inverterSize.exceeds) warnings.push(`Required inverter size exceeds listed tiers: about ${inverterSize.value} W with headroom.`);
+  if (controllerSize.exceeds) warnings.push(`Required MPPT output exceeds listed tiers: ${controllerSize.value} A. Consider multiple controllers.`);
+  if (alternatorSize.exceeds) warnings.push(`Alternator sizing exceeds listed tiers: ${alternatorSize.value} W. Verify vehicle-side current and alternator capacity.`);
+  if (controllerSize.value > config.solarChargerAmps && config.solarWatts > 0) warnings.push('The selected MPPT can clip solar output. Its output-current limit is included in the trip simulation; panel input voltage still needs checking.');
+  if (state.voltage === 24 && DEVICE_LIBRARY.some(device => state.loads[device.id].enabled && state.loads[device.id].powerPath === 'dc' && BUILTIN_IDS.has(device.id))) warnings.push('A 24 V bank may need a 24-to-12 V converter for direct DC appliances. Select USB / DC converter to include conversion losses and confirm device voltage.');
+  if (state.chemistry === 'agm') warnings.push('AGM capacity uses a generic temperature curve. High discharge current and absorption taper can reduce performance beyond this estimate.');
+  const fallback = state.solarPrecision.enabled && (!sun.usingPvWatts || state.solarPrecision.status !== 'ready');
+  if (fallback) warnings.push('Historical solar data is unavailable or loading. Solar sizing uses your manual baseline.');
+  if (state.fridgePrecision.enabled && fridgeClimateStatus !== 'ready' && state.loads.fridge.enabled) warnings.push('Fridge climate data is unavailable or loading. Cycling uses a temperature estimate.');
+  const totals = trip.daily.reduce((sum, day) => ({ solar: sum.solar + day.solarWh, drive: sum.drive + day.alternatorWh, shore: sum.shore + day.shoreWh, stored: sum.stored + day.acceptedWh }), {solar:0, drive:0, shore:0, stored:0});
+  const averageRecharge = (totals.solar + totals.drive + totals.shore) / state.trip.days;
+  const balance = averageRecharge - profile.dailyWh;
+  byId('dailyUseBig').textContent = `${formatEnergy(profile.dailyWh)}/day`;
+  byId('mobileDailyUse').textContent = `${formatEnergy(profile.dailyWh)}/day`;
+  byId('dailyUseAh').textContent = `${(profile.dailyWh / config.nominalVoltage).toFixed(1)} Ah/day @ ${config.nominalVoltage.toFixed(1)} V nominal`;
+  byId('usagePersona').textContent = energyPersona(profile.dailyWh);
+  byId('dailyRecharge').textContent = formatEnergy(averageRecharge);
+  byId('netFromBattery').textContent = `${formatEnergy(Math.abs(balance))} ${balance >= 0 ? 'surplus' : 'deficit'}`;
+  byId('autonomyTarget').textContent = `${state.autonomyDays} days`;
+  byId('estimatedSunHours').textContent = `${sun.adjustedHours.toFixed(1)} hr`;
+  byId('sunHoursSource').textContent = fallback ? `Solar data ${state.solarPrecision.status === 'loading' ? 'loading' : 'unavailable'}; using ${sun.adjustedHours.toFixed(1)} peak sun-hours. ${state.solarPrecision.error}` : sun.source;
+  byId('dataQuality').textContent = `Solar: ${sun.usingPvWatts ? 'historical monthly irradiation + generic system losses' : 'manual baseline'} · Daily weather: scenario assumptions · Battery: generic temperature curve.`;
+  byId('dataQuality').classList.toggle('is-fallback', fallback);
+  byId('recNoChargeAh').textContent = Number.isFinite(minimumAh) ? formatAh(minimumAh) : 'Raise starting charge';
+  byId('recNoChargeWh').textContent = Number.isFinite(minimumAh) ? `${formatEnergy(Math.ceil(minimumAh / 10) * 10 * config.nominalVoltage)} nominal bank · starts at ${config.startSocPct}%` : 'Starting charge must exceed the reserve.';
+  byId('recRechargeAh').textContent = tripMinimum.possible ? formatAh(tripMinimum.value) : 'No feasible size';
+  byId('recRechargeWh').textContent = tripMinimum.possible ? `${formatEnergy(tripMinimum.value * config.nominalVoltage)} nominal bank · keeps ${trip.reservePct.toFixed(0)}% reserve` : 'Raise starting charge or adjust your charging limits and schedule.';
+  byId('runtimeNoCharge').textContent = profile.dailyWh > 0 ? formatDays(Math.max(0, trip.capacityWh * usableFraction) / profile.dailyWh) : 'No consumption';
+  byId('runtimeWithRecharge').textContent = trip.firstReserveHour == null ? `Not within ${state.trip.days} days` : trip.firstReserveHour === 0 ? 'At trip start' : `Day ${Math.floor(trip.firstReserveHour / 24) + 1}, ${String(trip.firstReserveHour % 24).padStart(2, '0')}:00`;
+  byId('runwayText').textContent = `Available above reserve at departure: ${formatEnergy(Math.max(0, trip.capacityWh * usableFraction))}. Average solar ${formatEnergy(totals.solar / state.trip.days)}, driving ${formatEnergy(totals.drive / state.trip.days)}, shore ${formatEnergy(totals.shore / state.trip.days)} per day. Battery accepts ${formatEnergy(totals.stored / state.trip.days)}/day after charging losses.`;
+  const verdict = byId('tripVerdict');
+  verdict.textContent = faults.length ? 'Equipment needs attention' : trip.passes ? `Stays above reserve for ${state.trip.days} days` : trip.unservedWh > 0 ? `Energy runs out during this ${state.trip.days}-day trip` : `Reserve is reached during this ${state.trip.days}-day trip`;
+  verdict.closest('.trip-result').classList.toggle('trip-fails', !trip.passes || faults.length > 0);
+  byId('tripAdvice').textContent = faults.length ? `${faults[0]} The chart shows requested energy, assuming compatible equipment.` : trip.passes ? `${trip.minimumSocPct.toFixed(1)}% is the lowest modeled charge. Try the cloudy-day scenario to test a harder trip.` : tripMinimum.possible ? `For this schedule, try at least ${formatAh(tripMinimum.value)} at ${config.nominalVoltage.toFixed(1)} V, add charging before the reserve is reached, or reduce the largest loads.` : 'Start above your reserve and check charging limits before sizing a larger bank.';
+  const display = [
+    ['batteryAh','Battery',`${selected.batteryAh.value} Ah @ ${config.nominalVoltage.toFixed(1)} V`,`${formatEnergy(trip.nominalWh)} nominal; ${formatEnergy(trip.capacityWh)} temperature/health-adjusted.`],
+    ['solarWatts','Solar',config.solarWatts ? `${config.solarWatts} W` : 'No solar panels',`${sun.adjustedHours.toFixed(1)} peak sun-hours before each day's weather percentage.`],
+    ['solarChargerAmps','SolarCharger',config.solarChargerAmps ? `${config.solarChargerAmps} A MPPT` : 'No MPPT','Output limit is modeled. Verify cold panel voltage and input current separately.'],
+    ['alternatorWatts','Alternator',config.alternatorWatts ? `${config.alternatorWatts} W DC-DC` : 'No DC-DC',`Output at battery bus; vehicle-side demand is about ${Math.ceil(config.alternatorWatts / (state.assumptions.alternatorEfficiencyPct / 100))} W before vehicle wiring losses.`],
+    ['shoreAmps','Shore',config.shoreAmps ? `${config.shoreAmps} A charger` : 'No shore charger','Only contributes during entered shore hours; charge acceptance is limited by the battery.'],
+    ['inverterWatts','Inverter',selected.inverterWatts.value ? `${selected.inverterWatts.value} W pure sine` : 'No inverter',`Scheduled AC peak ${Math.ceil(profile.peakAcWatts)} W. ${state.assumptions.inverterEfficiencyPct}% conversion efficiency + ${state.assumptions.inverterIdleWatts} W standby.`]
+  ];
+  for (const [key, suffix, value, note] of display) {
+    byId(`component${suffix}`).textContent = value;
+    byId(`component${suffix}Note`).textContent = note;
+    const pill = byId(`component${suffix}Mode`);
+    pill.textContent = selected[key].manual ? 'Override' : ['batteryAh','solarWatts','alternatorWatts','shoreAmps'].includes(key) ? 'Input' : 'Sized';
+    pill.classList.toggle('manual', selected[key].manual);
   }
-
-  // Extremely high daily consumption
-  if (totalDailyWh > 8000) {
-    warnings.push("Daily consumption over 8 kWh is very high for a van build. Ensure your charging infrastructure can realistically keep up.");
+  byId('suggestedSystem').textContent = `${batterySize.value} Ah bank covers the larger of your reserve-day and trip targets. ${config.solarWatts > 0 ? `${suggestedSolar} W solar${solarRequired > config.roofSolarMax ? ' (space-limited)' : ''}.` : 'Solar stays off.'} ${config.alternatorWatts > 0 ? `${Math.max(alternatorSize.value, config.alternatorWatts)} W DC-DC.` : 'Alternator charging stays off.'} Apply, then check the trip again. These sizes do not verify hardware compatibility.`;
+  byId('applySuggested').disabled = !Number.isFinite(minimumAh) || !tripMinimum.possible || batterySize.value > 20000;
+  byId('syncInstalled').disabled = !Number.isFinite(minimumAh);
+  const warningBox = byId('systemWarnings');
+  warningBox.classList.toggle('hidden', warnings.length + faults.length === 0);
+  warningBox.innerHTML = [...faults, ...warnings].map(message => `<p class="system-warning">${escapeHtml(message)}</p>`).join('');
+  updateBreakdown(profile.entries);
+  renderChart(trip);
+  lastResults = { recommendedAhNoRecharge: minimumAh, recommendedAhRecharge: tripMinimum.value };
+  lastPlan = { profile, selected, config, trip, batterySize, suggestedSolar, alternatorSize, inverterSize };
+  if (!initializing && !applyingPreset && JSON.stringify(buildSettingsPayload()) !== presetSignature) {
+    state.activePreset = null;
+    byId('presets').querySelectorAll('button').forEach(button => button.classList.remove('active'));
+    byId('presetStatus').textContent = 'Customized plan.';
   }
-
-  // Cold weather charging warning for LiFePO4
-  if (state.chemistry === "lifepo4" && state.fridgeAverageTempF < 32) {
-    warnings.push("LiFePO4 batteries cannot safely charge below 32\u00B0F (0\u00B0C) without a heated battery system. Factor in a battery heater or insulated box.");
+  if (!initializing) {
+    clearTimeout(savedPlanTimer);
+    savedPlanTimer = setTimeout(() => safeLocalStorageSet(PLAN_STORAGE_KEY, JSON.stringify(buildSettingsPayload())), 250);
   }
-
-  // Summer sizing warning — high temps with A/C
-  if (state.fridgeAverageTempF > 90 && state.loads.ac && state.loads.ac.enabled) {
-    warnings.push("Summer sizing alert: temperatures above 90\u00B0F with A/C enabled will dominate your energy budget. Consider increasing solar and battery capacity beyond the baseline recommendation.");
-  }
-
-  // Winter sizing warning — cold temps
-  if (state.fridgeAverageTempF < 40) {
-    warnings.push("Winter sizing alert: temperatures below 40\u00B0F reduce battery capacity and increase heater draw. Plan for shorter autonomy or a larger battery bank.");
-  }
-
-  const container = byId("systemWarnings");
-  if (!container) return;
-
-  if (warnings.length === 0) {
-    container.classList.add("hidden");
-    container.innerHTML = "";
-    return;
-  }
-
-  container.classList.remove("hidden");
-  container.innerHTML = warnings
-    .map((msg) => `<p class="system-warning">${msg}</p>`)
-    .join("");
 }
 
 function init() {
+  window.addEventListener('pagehide', () => {
+    clearTimeout(savedPlanTimer);
+    if (!initializing) safeLocalStorageSet(PLAN_STORAGE_KEY, JSON.stringify(buildSettingsPayload()));
+  });
   const mobileSteps = [...document.querySelectorAll("[data-mobile-step]")];
   mobileSteps.forEach((section, index) => {
     const button = section.querySelector(".mobile-step-toggle");
@@ -2990,6 +2884,8 @@ function init() {
     (v) => `${v.toFixed(2)} hr`,
     (value) => {
       state.alternator.driveHoursDay = value;
+      state.trip.schedule.forEach(day => { day.driveHours = value; });
+      renderTripControls();
     }
   );
 
@@ -3008,11 +2904,17 @@ function init() {
 
   byId("chemistry").addEventListener("change", (event) => {
     state.chemistry = event.target.value;
+    state.trip.nominalVoltage = state.voltage / 12 * (state.chemistry === 'lifepo4' ? 12.8 : 12);
+    renderTripControls();
     calculate();
   });
 
   byId("batteryVoltage").addEventListener("change", (event) => {
+    const previous = state.voltage;
     state.voltage = parseInt(event.target.value, 10);
+    state.trip.nominalVoltage *= state.voltage / previous;
+    state.trip.chargeVoltage *= state.voltage / previous;
+    renderTripControls();
     calculate();
   });
 
@@ -3021,8 +2923,10 @@ function init() {
       return;
     }
 
-    const recommendation = clamp(Math.ceil(lastResults.recommendedAhNoRecharge / 10) * 10, 100, 1800);
+    const recommendation = pickTier(lastResults.recommendedAhNoRecharge, state.componentTiers.batteryAh);
     state.installedAh = recommendation;
+    state.manualComponents.batteryAh = 'auto';
+    buildManualSelectOptions();
     uiSetters.installedAh(recommendation);
     calculate();
   });
@@ -3048,11 +2952,25 @@ function init() {
   });
 
   wirePresetButtons();
+  wirePlanningControls();
   window.addEventListener("resize", scheduleLoadGridLayout);
   refreshAssumptionUi();
   refreshRechargeVisibility();
   setComponentModeUi(state.componentMode);
   applyPreset("weekender");
+  try {
+    const shared = window.location.hash.startsWith('#plan=') ? window.location.hash.slice(6) : null;
+    if (shared && shared.length > 100000) throw new Error('This shared plan is too large.');
+    const stored = shared ? new TextDecoder().decode(Uint8Array.from(atob(shared), char => char.charCodeAt(0))) : safeLocalStorageGet(PLAN_STORAGE_KEY);
+    if (stored) {
+      applySettingsFromPayload(JSON.parse(stored));
+      byId('settingsStatus').textContent = shared ? 'Shared plan loaded. Future edits save in this browser.' : 'Your saved plan has been restored.';
+    }
+  } catch (error) {
+    byId('settingsStatus').textContent = `Saved/shared plan could not be loaded: ${error.message}`;
+  }
+  initializing = false;
+  calculate();
 }
 
 document.addEventListener("DOMContentLoaded", init);

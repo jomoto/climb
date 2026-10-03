@@ -1383,3 +1383,64 @@ body[data-theme="dark"] .system-warning {
     padding: 1.2rem 0.8rem 6rem;
   }
 }
+
+/* Planning controls and accessible numerical entry. */
+.app-grid > .panel, .panel-section { min-width: 0; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible,
+a:focus-visible, [role="button"]:focus-visible {
+  outline: 3px solid var(--sky);
+  outline-offset: 3px;
+}
+.watt-pill { border: 0; font: inherit; font-family: "IBM Plex Mono", monospace; font-size: 0.75rem; }
+.planning-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; margin: 0.65rem 0; }
+.planning-fields label, .custom-load-form label { display: grid; gap: 0.3rem; font-size: 0.78rem; color: var(--muted); }
+input[type="number"], input[type="text"], #customLoadName, #shareLink {
+  min-width: 0; max-width: 100%; box-sizing: border-box; border: 1px solid var(--panel-border);
+  border-radius: 8px; padding: 0.45rem 0.5rem; background: var(--panel); color: var(--text); font: inherit;
+}
+input[type="number"]:invalid { border-color: var(--danger); outline-color: var(--danger); }
+.exact-input { width: 7rem; justify-self: end; font-size: 0.85rem !important; }
+.load-details { border-top: 1px solid var(--panel-border); padding-top: 0.6rem; font-size: 0.8rem; }
+.load-details summary, .advanced-settings summary, .trip-result summary { cursor: pointer; color: var(--sky); font-size: 0.83rem; font-weight: 600; }
+.load-details .planning-fields { grid-template-columns: 1fr; }
+.custom-load-form { display: flex; align-items: end; flex-wrap: wrap; gap: 0.7rem; margin-top: 0.9rem; }
+.custom-load-form label { flex: 1; min-width: 150px; }
+.advanced-settings { margin-top: 0.8rem; }
+.trip-scenarios { margin: 0.8rem 0; }
+.schedule-scroll { max-width: 100%; overflow-x: auto; }
+.plan-table { border-collapse: collapse; font-size: 0.72rem; width: 100%; }
+.plan-table caption { text-align: left; color: var(--muted); padding: 0.5rem 0; }
+.plan-table td, .plan-table th { padding: 0.45rem 0.3rem; text-align: right; border-bottom: 1px solid var(--panel-border); white-space: nowrap; }
+.plan-table th { color: var(--muted); }
+.plan-table input { width: 4.3rem; font-size: 0.78rem; }
+.trip-result { border: 1px solid var(--teal); border-radius: 14px; background: rgba(29,155,139,0.06); padding: 0.9rem; margin-top: 0.7rem; }
+.trip-result.trip-fails { border-color: var(--danger); background: rgba(212,91,63,0.06); }
+#tripVerdict { font-size: 1.22rem; font-weight: 700; margin: 0.55rem 0; color: var(--teal); }
+.trip-fails #tripVerdict { color: var(--danger); }
+#tripAdvice { font-size: 0.85rem; color: var(--muted); line-height: 1.45; margin: 0.5rem 0; }
+#batteryChart { display: block; width: 100%; height: auto; }
+#batteryChart text { fill: var(--muted); font-size: 11px; font-family: "IBM Plex Mono", monospace; }
+.chart-grid { stroke: var(--panel-border); }
+.chart-reserve { stroke: var(--danger); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.chart-reserve-area { fill: var(--danger); opacity: 0.08; }
+.chart-battery { fill: none; stroke: var(--teal); stroke-width: 2.5; }
+.data-quality { color: var(--muted); font-size: 0.75rem; line-height: 1.5; }
+.data-quality.is-fallback { border-left: 3px solid var(--danger); padding: 0.4rem 0.6rem; background: rgba(212,91,63,0.07); }
+.results-panel { position: static; }
+#shareLink { width: 100%; margin-top: 0.6rem; }
+.hidden { display: none !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+@media (max-width: 420px) { .planning-fields { grid-template-columns: 1fr; } .presets { flex-wrap: wrap; border-radius: 12px; } }
+@media print {
+  body, body[data-theme="dark"] { --text: #12231d; --muted: #4f635a; --panel: white; --panel-border: #ccd5d0; --teal: #137e71; --sky: #245e81; background: white; color: var(--text); }
+  .controls-panel, .theme-toggle, .mobile-live-summary, .background-orb, .components-toolbar,
+  .manual-controls, #applySuggested, .map-modal { display: none !important; }
+  .layout { padding: 0; max-width: none; } .app-grid { display: block; }
+  .panel, .trip-result, .component-item { box-shadow: none; background: white !important; }
+  .results-panel { border: 0; padding: 0; }
+  .component-item, .recommend-card, .trip-result, .runway-card { break-inside: avoid; }
+  .trip-result details > * { display: block !important; }
+  .schedule-scroll { overflow: visible; }
+  .hero { margin-bottom: 0.5rem; } .hero h1 { font-size: 1.8rem; }
+  button, .tool-site-nav, .subtitle { display: none !important; }
+}
