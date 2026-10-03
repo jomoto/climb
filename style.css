@@ -449,7 +449,7 @@ iframe {
     transform: translateY(-2px);
 }
 
-.project-card--where2climb { --card-accent: #6fa3d4; }
+.project-card--cragmaps    { --card-accent: #6fa3d4; }
 .project-card--vanlife     { --card-accent: #d4a54f; }
 
 .project-body {
