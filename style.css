@@ -280,9 +280,10 @@ iframe {
     margin-bottom: 20px;
 }
 
-.climbing-header h1 {
+.climbing-header h1,
+.climbing-reports h2 {
     font-family: Georgia, "Times New Roman", serif;
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: 400;
     letter-spacing: -0.04em;
     line-height: 1.2;
@@ -350,14 +351,6 @@ iframe {
     gap: 32px;
     border-top: 1px solid var(--paper-rule);
     padding: 20px 0 0;
-}
-
-.climbing-reports h2 {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 1.65rem;
-    letter-spacing: -0.04em;
-    margin: 0;
-    color: var(--ink);
 }
 
 .climbing-reports ul {
@@ -780,8 +773,9 @@ body.about {
         padding: 24px 24px 32px;
     }
 
-    .climbing-header h1 {
-        font-size: 1.65rem;
+    .climbing-header h1,
+    .climbing-reports h2 {
+        font-size: 1.4rem;
     }
 
     .climbing-map {
