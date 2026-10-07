@@ -6,7 +6,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20261002a">
+    <link rel="stylesheet" href="style.css?v=20261007b">
     <title>Projects — Shino Jomoto</title>
     <meta name="description" content="Side projects by Shino Jomoto — tools, prototypes, and things I've built.">
     <meta name="author" content="Shino Jomoto">
@@ -18,7 +18,7 @@
 </head>
 <body class="projects">
     <header class="site-header">
-        <a class="site-brand" href="index.html"><span aria-hidden="true"></span>Shino Jomoto</a>
+        <a class="site-brand" href="index.html">Shino Jomoto</a>
         <nav class="site-nav" aria-label="Primary">
             <a href="about.html">About</a>
             <a href="climbing.html">Climbing</a>
@@ -30,19 +30,27 @@
         <header class="projects-header">
             <h1>Projects</h1>
         </header>
-        <section class="projects-grid">
-            <a class="project-card project-card--cragmaps" href="https://cragmaps.com/">
-                <div class="project-body">
-                    <h2>CragMaps</h2>
-                    <p>Interactive map of climbing destinations. Filter by month, climbing style, season, and rock type to find your next crag.</p>
+        <section class="projects-list" aria-label="Side projects">
+            <article class="project project--cragmaps">
+                <a class="project-print" href="https://cragmaps.com/" aria-label="Open CragMaps">
+                    <img src="assets/images/projects/cragmaps.jpg" alt="CragMaps showing climbing destinations around the world and trip planning filters" width="1280" height="720" fetchpriority="high">
+                    <span class="project-print-caption" aria-hidden="true">cragmaps.com <span>↗</span></span>
+                </a>
+                <div class="project-copy">
+                    <h2><a href="https://cragmaps.com/">CragMaps</a></h2>
+                    <p class="project-description">figure out where to climb next</p>
                 </div>
-            </a>
-            <a class="project-card project-card--vanlife" href="vanlife-power-planner/">
-                <div class="project-body">
-                    <h2>Vanlife Power Planner</h2>
-                    <p>Model daily energy for a van build. Fridge compressor duty cycles, solar via PVWatts, alternator tapering, cold-weather derating. Auto-sizes battery, solar, charger, and inverter.</p>
+            </article>
+            <article class="project project--vanlife">
+                <a class="project-print" href="vanlife-power-planner/" aria-label="Open Van Build Power Planner">
+                    <img src="assets/images/projects/vanlife-power-planner.jpg?v=20261007c" alt="Van Build Power Planner with appliance settings and a chart of battery charge over a seven-day trip" width="1280" height="720" decoding="async">
+                    <span class="project-print-caption" aria-hidden="true">Van Build Power Planner <span>↗</span></span>
+                </a>
+                <div class="project-copy">
+                    <h2><a href="vanlife-power-planner/">Van Build Power Planner</a></h2>
+                    <p class="project-description">Work out how much power your van needs</p>
                 </div>
-            </a>
+            </article>
         </section>
     </main>
 </body>
