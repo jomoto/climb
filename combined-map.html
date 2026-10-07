@@ -17,9 +17,9 @@
             --blue-soft: rgba(86, 143, 208, 0.32);
             --green: #56a878;
             --green-soft: rgba(86, 168, 120, 0.32);
-            --panel: rgba(20, 24, 37, 0.94);
-            --ink: #e8eaf0;
-            --muted: #9aa3b6;
+            --panel: rgba(236, 233, 225, 0.97);
+            --ink: #191a17;
+            --muted: #50514b;
         }
 
         *,
@@ -38,7 +38,7 @@
 
         body {
             font-family: "IBM Plex Mono", monospace;
-            background: #18202a;
+            background: #d5d2cb;
         }
 
         #combined-map {
@@ -121,10 +121,10 @@
         .map-key {
             min-width: 186px;
             padding: 9px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 12px;
+            border: 1px solid #8d8b82;
+            border-radius: 4px;
             background: var(--panel);
-            box-shadow: 0 8px 24px rgba(20, 24, 37, 0.3);
+            box-shadow: 2px 4px 10px rgba(37, 35, 29, 0.15);
             color: var(--ink);
         }
 
@@ -145,7 +145,7 @@
             gap: 9px;
             padding: 9px 8px;
             border: 0;
-            border-radius: 7px;
+            border-radius: 2px;
             background: transparent;
             color: var(--ink);
             font: inherit;
@@ -156,16 +156,16 @@
 
         .map-key button:hover,
         .map-key button:focus-visible {
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(25, 26, 23, 0.08);
             outline: none;
         }
 
         .map-key button[aria-pressed="false"] {
-            color: #70798c;
+            color: #70736c;
         }
 
         .map-key button[aria-pressed="false"] .map-key-swatch {
-            background: #70798c;
+            background: #8b8d83;
         }
 
         .map-key-swatch {
@@ -191,8 +191,9 @@
         .leaflet-popup-content-wrapper {
             overflow: hidden;
             padding: 0;
-            border-radius: 12px;
-            box-shadow: 0 12px 30px rgba(20, 24, 37, 0.22);
+            border-radius: 4px;
+            background: #ece9e1;
+            box-shadow: 0 8px 20px rgba(37, 35, 29, 0.16);
         }
 
         .leaflet-popup-content {
@@ -201,7 +202,7 @@
         }
 
         .map-popup {
-            color: #202737;
+            color: var(--ink);
         }
 
         .photo-popup img {
@@ -229,7 +230,7 @@
             align-items: center;
             gap: 9px;
             margin: 0;
-            font-family: "Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif;
+            font-family: Georgia, "Times New Roman", serif;
             font-size: 1.08rem;
             line-height: 1.25;
         }

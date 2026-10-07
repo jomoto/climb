@@ -267,25 +267,25 @@ iframe {
     border-bottom-color: var(--accent-strong);
 }
 
-.climbing {
-    background: linear-gradient(180deg, #222840 0%, var(--bg) 55%, var(--bg-dark) 100%);
-    min-height: 100vh;
-}
-
 .climbing-shell {
-    padding: 6vh 6vw 8vh;
+    width: min(100%, 1280px);
+    margin: 0 auto;
+    padding: 34px 4vw 40px;
 }
 
 .climbing-header {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    margin-bottom: 32px;
+    margin-bottom: 20px;
 }
 
 .climbing-header h1 {
-    font-family: "Franklin Gothic Medium", "Franklin Gothic", "ITC Franklin Gothic", "Arial Narrow", Arial, sans-serif;
-    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 2rem;
+    font-weight: 400;
+    letter-spacing: -0.04em;
+    line-height: 1.2;
     margin: 0;
 }
 
@@ -297,7 +297,7 @@ iframe {
 }
 
 .climbing-atlas {
-    margin-bottom: 32px;
+    margin-bottom: 24px;
 }
 
 .climbing-atlas-heading {
@@ -305,14 +305,15 @@ iframe {
     align-items: baseline;
     justify-content: space-between;
     gap: 32px;
-    margin-bottom: 20px;
+    margin-bottom: 14px;
 }
 
 .climbing-atlas-heading h2 {
-    font-family: "Franklin Gothic Medium", "Franklin Gothic", "ITC Franklin Gothic", "Arial Narrow", Arial, sans-serif;
-    font-size: 1.1rem;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    font-weight: 400;
+    letter-spacing: 0.035em;
+    line-height: 1.5;
     margin: 0;
     color: var(--ink-muted);
 }
@@ -327,39 +328,36 @@ iframe {
 }
 
 .climbing-map {
-    border-radius: 18px;
+    /* Leave the report heading visible beneath the map on the first screen. */
+    height: clamp(260px, calc(100svh - 310px), 660px);
+    padding: 9px;
     overflow: hidden;
-    min-height: 68vh;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: #1e2235;
+    box-shadow: 1px 2px 0 #a5a298, 6px 12px 18px rgba(37, 35, 29, 0.12);
+    border: 1px solid #8d8b82;
+    background: #ece9e1;
 }
 
 .climbing-map iframe {
     display: block;
     width: 100%;
     height: 100%;
-    min-height: 68vh;
 }
 
 .climbing-reports {
     display: grid;
-    grid-template-columns: minmax(160px, 0.3fr) 1fr;
-    align-items: start;
+    grid-template-columns: minmax(160px, 0.28fr) 1fr;
+    align-items: center;
     gap: 32px;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--paper-rule);
+    padding: 20px 0 0;
 }
 
 .climbing-reports h2 {
-    font-family: "Franklin Gothic Medium", "Franklin Gothic", "ITC Franklin Gothic", "Arial Narrow", Arial, sans-serif;
-    font-size: 1.1rem;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    margin: 0 0 16px;
-    color: var(--ink-muted);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.65rem;
+    letter-spacing: -0.04em;
+    margin: 0;
+    color: var(--ink);
 }
 
 .climbing-reports ul {
@@ -372,10 +370,9 @@ iframe {
 }
 
 .climbing-reports a {
-    font-family: "Franklin Gothic Medium", "Franklin Gothic", "ITC Franklin Gothic", "Arial Narrow", Arial, sans-serif;
-    font-size: 1rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.8rem;
     color: var(--ink);
-    transition: color 200ms ease, transform 200ms ease;
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -384,25 +381,21 @@ iframe {
 .climbing-reports a::before {
     content: "→";
     color: var(--accent-strong);
-    transition: transform 200ms ease;
 }
 
 .climbing-reports a:hover {
-    color: var(--nav-hover);
-    transform: translateX(4px);
-}
-
-.climbing-reports a:hover::before {
-    transform: translateX(3px);
+    text-decoration: underline;
+    text-underline-offset: 4px;
 }
 
 /* ── Projects ── */
 
-.projects {
+.projects,
+.climbing {
     --ink: #191a17;
     --ink-muted: #50514b;
     --accent-strong: #536e73;
-    --projects-rule: rgba(25, 26, 23, 0.25);
+    --paper-rule: rgba(25, 26, 23, 0.25);
     min-height: 100vh;
     background: #d5d2cb;
     color: var(--ink);
@@ -410,7 +403,8 @@ iframe {
     isolation: isolate;
 }
 
-.projects::before {
+.projects::before,
+.climbing::before {
     content: "";
     position: fixed;
     inset: 0;
@@ -420,7 +414,7 @@ iframe {
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)'/%3E%3C/svg%3E");
 }
 
-.projects .site-header {
+:is(.projects, .climbing) .site-header {
     min-height: 88px;
     padding: 24px 4vw;
     flex-direction: row;
@@ -431,7 +425,7 @@ iframe {
     -webkit-backdrop-filter: none;
 }
 
-.projects .site-brand {
+:is(.projects, .climbing) .site-brand {
     font-family: Georgia, "Times New Roman", serif;
     font-size: 1.65rem;
     font-weight: 700;
@@ -439,7 +433,7 @@ iframe {
     text-transform: none;
 }
 
-.projects .site-nav {
+:is(.projects, .climbing) .site-nav {
     width: auto;
     gap: 32px;
     font-size: 0.8rem;
@@ -448,13 +442,13 @@ iframe {
     color: var(--ink);
 }
 
-.projects .site-nav a {
+:is(.projects, .climbing) .site-nav a {
     min-height: 36px;
     padding: 8px 0;
 }
 
-.projects .site-nav a:hover,
-.projects .site-nav a[aria-current="page"] {
+:is(.projects, .climbing) .site-nav a:hover,
+:is(.projects, .climbing) .site-nav a[aria-current="page"] {
     border-bottom-color: var(--ink);
 }
 
@@ -570,7 +564,8 @@ iframe {
 }
 
 .projects-shell a:focus-visible,
-.projects .site-header a:focus-visible {
+.climbing-shell a:focus-visible,
+:is(.projects, .climbing) .site-header a:focus-visible {
     outline: 2px solid #536e73;
     outline-offset: 6px;
 }
@@ -715,11 +710,6 @@ body.about {
         text-align: left;
     }
 
-    .climbing-map,
-    .climbing-map iframe {
-        min-height: 70vh;
-    }
-
     .climbing-reports {
         grid-template-columns: 1fr;
         gap: 18px;
@@ -750,7 +740,7 @@ body.about {
     }
 
     .climbing-shell {
-        padding-top: 36px;
+        padding-top: 30px;
     }
 
     .projects-shell {
@@ -786,18 +776,30 @@ body.about {
 }
 
 @media (max-width: 640px) {
-    .projects .site-header {
+    .climbing-shell {
+        padding: 24px 24px 32px;
+    }
+
+    .climbing-header h1 {
+        font-size: 1.65rem;
+    }
+
+    .climbing-map {
+        padding: 6px;
+    }
+
+    :is(.projects, .climbing) .site-header {
         padding: 22px 24px 14px;
         flex-direction: column;
         align-items: flex-start;
         gap: 14px;
     }
 
-    .projects .site-brand {
+    :is(.projects, .climbing) .site-brand {
         font-size: 1.5rem;
     }
 
-    .projects .site-nav {
+    :is(.projects, .climbing) .site-nav {
         width: 100%;
         gap: 12px;
         font-size: 0.75rem;
