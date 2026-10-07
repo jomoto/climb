@@ -532,8 +532,8 @@ iframe {
 .project h2 {
     margin: 0 0 14px;
     font-family: Georgia, "Times New Roman", serif;
-    font-size: clamp(1.5rem, 2.6vw, 2rem);
-    font-weight: 700;
+    font-size: 1.5rem;
+    font-weight: 400;
     letter-spacing: -0.04em;
     line-height: 1.15;
 }
@@ -834,7 +834,7 @@ body.about {
     }
 
     .project h2 {
-        font-size: 1.6rem;
+        font-size: 1.4rem;
         margin-bottom: 12px;
     }
 
