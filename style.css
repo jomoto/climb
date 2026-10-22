@@ -407,6 +407,27 @@ iframe {
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)'/%3E%3C/svg%3E");
 }
 
+/* Match both pages to the deep teal and light gray reference. */
+.projects,
+.climbing {
+    --ink: #dddddd;
+    --ink-muted: #afbec2;
+    --accent-strong: #dddddd;
+    --paper-rule: rgba(221, 221, 221, 0.25);
+    background: #02242e;
+}
+
+.projects::before,
+.climbing::before {
+    content: none;
+}
+
+.climbing .climbing-map {
+    background: #02242e;
+    border-color: var(--paper-rule);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
 :is(.projects, .climbing) .site-header {
     min-height: 88px;
     padding: 24px 4vw;
@@ -488,9 +509,9 @@ iframe {
     display: block;
     padding: 13px 13px 0;
     position: relative;
-    border: 1px solid #8d8b82;
-    background: #ece9e1;
-    box-shadow: 1px 2px 0 #a5a298, 6px 12px 18px rgba(37, 35, 29, 0.16);
+    border: 1px solid var(--paper-rule);
+    background: #02242e;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     transform: rotate(var(--print-angle));
     transition: transform 200ms ease, box-shadow 200ms ease;
 }
@@ -501,7 +522,7 @@ iframe {
     height: auto;
     aspect-ratio: 16 / 9;
     object-fit: cover;
-    border: 1px solid #b0afa5;
+    border: 1px solid var(--paper-rule);
 }
 
 .project-print-caption {
@@ -511,7 +532,7 @@ iframe {
     gap: 12px;
     padding: 15px 2px;
     font-size: 0.65rem;
-    color: #4e5048;
+    color: var(--ink-muted);
 }
 
 .project-print-caption > span {
@@ -522,7 +543,7 @@ iframe {
 
 .project-print:hover {
     transform: translateY(-4px) rotate(0deg);
-    box-shadow: 1px 2px 0 #a5a298, 8px 16px 22px rgba(37, 35, 29, 0.19);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
 .project-copy {
@@ -561,6 +582,11 @@ iframe {
 :is(.projects, .climbing) .site-header a:focus-visible {
     outline: 2px solid #536e73;
     outline-offset: 6px;
+}
+
+:is(.projects, .climbing) main a:focus-visible,
+:is(.projects, .climbing) .site-header a:focus-visible {
+    outline-color: var(--accent-strong);
 }
 
 /* ── About ── */
