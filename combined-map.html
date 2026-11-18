@@ -563,6 +563,7 @@
             var marker = L.marker([latitude, longitude], { icon: markerIcon('photo') });
             var entry = {
                 id: photoEntries.length,
+                filename: filename,
                 marker: marker,
                 latitude: latitude,
                 longitude: longitude
@@ -670,7 +671,16 @@
             parseCSV(files[0]).forEach(addPhoto);
             parseCSV(files[1]).forEach(addTick);
             addMapKey();
-            if (mapBounds.isValid()) {
+            var requestedPhoto = new URLSearchParams(window.location.search).get('photo');
+            var startPhoto = photoEntries.find(function (entry) {
+                return entry.filename === requestedPhoto;
+            });
+            if (startPhoto) {
+                map.setView([startPhoto.latitude, startPhoto.longitude], map.getMaxZoom(), { animate: false });
+                photoLayer.zoomToShowLayer(startPhoto.marker, function () {
+                    startPhoto.marker.openPopup();
+                });
+            } else if (mapBounds.isValid()) {
                 map.fitBounds(mapBounds.pad(0.06), { maxZoom: 3 });
             }
         }).catch(function (error) {
